@@ -15,9 +15,9 @@
         //
         function gotoSanFran(){
             var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
-            camera.setAltitude(1400);
+            camera.setAltitude(800);
             camera.setLatitude(37.79);
-            camera.setLongitude(-122.40); 
+            camera.setLongitude(-122.396); 
             ge.getView().setAbstractView(camera);
         }
        
@@ -36,11 +36,11 @@
 
         function scanLoop() {
             console.time('scan')
-            var step = 16
+            var step = 30
             var sp = scanProgress
             //console.log('before',Number(sp[0]),Number(sp[1]))
             var dims = scanDims
-            var sample = batchShot(sp[0], sp[1], step, step,1)
+            var sample = batchShot(sp[0], sp[1], step, step,2)
             samples = samples.concat(sample)
             for(var i=0; i<sample.length; i++) {
                 var sam = sample[i]
@@ -80,12 +80,14 @@
             for(var i=0; i< heights.length; i++){
                 var h = heights[i]
                 if( h !== 0){
-                    var ci = 4*i
-                    var rgb = HSVtoRGB((h-minH)/range, 1, 0.5)
-                    imgd.data[ci] = rgb.r
-                    imgd.data[ci+1] = rgb.b
-                    imgd.data[ci+2] = rgb.g
-                    imgd.data[ci+3] = 255
+                    var rgb = HSVtoRGB(1-(h-minH)/range, 1, 0.5)
+                    imgd.data[4*i] = rgb.r
+                    imgd.data[4*i+1] = rgb.b
+                    imgd.data[4*i+2] = rgb.g
+                    imgd.data[4*i+3] = 255
+                } else {
+                   imgd.data[4*i] = imgd.data[4*i+1] = imgd.data[4*i+2] = 0
+                   imgd.data[4*i+3] = 255
                 }
             }
             ctx.putImageData(imgd,0,0)
@@ -97,7 +99,7 @@
 
 </head>
 <body>
-<button onclick="gotoSanFran()">san fransisco</button>
+<button onclick="gotoSanFran()">fly to san fransisco</button>
 <button onclick="altitudeScan()">start scan</button>
 
 <div id="map3d" style="height: 600px; width: 600px;"></div>
