@@ -41,13 +41,12 @@
         }
 
         function scanLoop() {
-            console.time('scan')
-            var step = 30
             var sp = scanProgress
-            //console.log('before',Number(sp[0]),Number(sp[1]))
             var dims = scanDims
-            var sample = batchShot(sp[0], sp[1], step, step,2)
-            samples = samples.concat(sample)
+            console.time('sample')
+            var sample = batchShot(sp[0], sp[1], scanDims[0], 1,2)
+            console.timeEnd('sample')
+            //samples = samples.concat(sample)
             for(var i=0; i<sample.length; i++) {
                 var sam = sample[i]
                 var indx = sam.y*dims[0]+sam.x
@@ -59,13 +58,7 @@
                     heights[indx] = h
                 }
             }
-            sp[0] += step
-            if(sp[0]>=dims[0]){
-                sp[1] += step
-                sp[0] = 0
-            }
-            //console.log('after',Number(sp[0]),Number(sp[1]))
-            console.timeEnd('scan')
+            sp[1] += 1
             drawHeights()
             if( sp[0]<dims[0] && sp[1]<dims[1] && continueScan){
                 setTimeout( scanLoop, 100)
