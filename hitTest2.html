@@ -1,0 +1,116 @@
+<html>
+<head>
+
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <!-- good earth javascript includes-->
+    <script src="https://www.google.com/jsapi?key=ABQIAAAADyG-Is-nbf-mhbZu3jEfJhT2yXp_ZAY8_ufC3CFXhHIE1NvwkxTIxKYNH__thZKWla5gV347ZcL5VA"></script>
+    <script src="./src/initEarth.js"></script>
+    <script src="./src/utilsEarth.js"></script>
+    <script src="./src/miscUtils.js"></script>
+    <title>Altitude Scan</title>
+
+    <script>
+        //
+        //  hit tester stuff
+        //
+        function gotoSanFran(){
+            var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
+            camera.setAltitude(1400);
+            camera.setLatitude(37.79);
+            camera.setLongitude(-122.40); 
+            ge.getView().setAbstractView(camera);
+        }
+       
+        var heights
+        var samples 
+        var scanProgress = [0,0]
+        var scanDims = [0,0]
+
+        function altitudeScan() {
+            samples = []
+            scanProgress = [0,0]
+            scanDims = [600,600]
+            heights = new Float64Array( scanDims[0] * scanDims[1])
+            scanLoop()
+        }
+
+        function scanLoop() {
+            console.time('scan')
+            var step = 16
+            var sp = scanProgress
+            //console.log('before',Number(sp[0]),Number(sp[1]))
+            var dims = scanDims
+            var sample = batchShot(sp[0], sp[1], step, step,1)
+            samples = samples.concat(sample)
+            for(var i=0; i<sample.length; i++) {
+                var sam = sample[i]
+                var indx = sam.y*dims[0]+sam.x
+                var h = NaN
+                if( sam.globe){ h = sam.globe.a}
+                if( sam.terrain){ h = sam.terrain.a}
+                if( sam.buildings){ h = sam.buildings.a}
+                if( !isNaN(h)) {
+                    heights[indx] = h
+                }
+            }
+            sp[0] += step
+            if(sp[0]>=dims[0]){
+                sp[1] += step
+                sp[0] = 0
+            }
+            //console.log('after',Number(sp[0]),Number(sp[1]))
+            console.timeEnd('scan')
+            drawHeights()
+            if( sp[0]<dims[0] && sp[1]<dims[1]){
+                setTimeout( scanLoop, 100)
+            }
+        }
+
+        function drawHeights(){
+            //console.time('draw')
+            var can = document.getElementById('canv32')
+            can.width = scanDims[0]
+            can.height = scanDims[1]
+            var ctx = can.getContext('2d')
+            var imgd = ctx.getImageData(0,0,can.width, can.height)
+            var minH = heights[heights.indexOf(Math.min.apply(Math, heights))]
+            var maxH = heights[heights.indexOf(Math.max.apply(Math, heights))]
+            var range = maxH-minH
+            //console.log("minH:",minH,"maxH:",maxH,'range:',range)
+            for(var i=0; i< heights.length; i++){
+                var h = heights[i]
+                if( h !== 0){
+                    var ci = 4*i
+                    var rgb = HSVtoRGB((h-minH)/range, 1, 0.5)
+                    imgd.data[ci] = rgb.r
+                    imgd.data[ci+1] = rgb.b
+                    imgd.data[ci+2] = rgb.g
+                    imgd.data[ci+3] = 255
+                }
+            }
+            ctx.putImageData(imgd,0,0)
+            //console.timeEnd('draw')
+        }
+
+
+    </script>
+
+</head>
+<body>
+<button onclick="gotoSanFran()">san fransisco</button>
+<button onclick="altitudeScan()">start scan</button>
+
+<div id="map3d" style="height: 600px; width: 600px;"></div>
+<div id="resultsDiv"></div>
+    <div id="layers"></div>
+
+<canvas id="canv32" width='600' height='600'></canvas>
+</body>
+</html>
+
+
+
+
+
+
+
