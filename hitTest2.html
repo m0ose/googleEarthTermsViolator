@@ -25,13 +25,19 @@
         var samples 
         var scanProgress = [0,0]
         var scanDims = [0,0]
-
+        var continueScan = true
+        
         function altitudeScan() {
+            continueScan = true
             samples = []
             scanProgress = [0,0]
             scanDims = [600,600]
             heights = new Float64Array( scanDims[0] * scanDims[1])
             scanLoop()
+        }
+
+        function stopScan() {
+            continueScan = false
         }
 
         function scanLoop() {
@@ -61,13 +67,12 @@
             //console.log('after',Number(sp[0]),Number(sp[1]))
             console.timeEnd('scan')
             drawHeights()
-            if( sp[0]<dims[0] && sp[1]<dims[1]){
+            if( sp[0]<dims[0] && sp[1]<dims[1] && continueScan){
                 setTimeout( scanLoop, 100)
             }
         }
 
         function drawHeights(){
-            //console.time('draw')
             var can = document.getElementById('canv32')
             can.width = scanDims[0]
             can.height = scanDims[1]
@@ -76,7 +81,6 @@
             var minH = heights[heights.indexOf(Math.min.apply(Math, heights))]
             var maxH = heights[heights.indexOf(Math.max.apply(Math, heights))]
             var range = maxH-minH
-            //console.log("minH:",minH,"maxH:",maxH,'range:',range)
             for(var i=0; i< heights.length; i++){
                 var h = heights[i]
                 if( h !== 0){
@@ -91,7 +95,6 @@
                 }
             }
             ctx.putImageData(imgd,0,0)
-            //console.timeEnd('draw')
         }
 
 
@@ -101,6 +104,7 @@
 <body>
 <button onclick="gotoSanFran()">fly to san fransisco</button>
 <button onclick="altitudeScan()">start scan</button>
+<button onclick="stopScan()">stop scan</button>
 
 <div id="map3d" style="height: 600px; width: 600px;"></div>
 <div id="resultsDiv"></div>
