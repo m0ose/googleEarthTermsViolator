@@ -13,13 +13,6 @@
         //
         //  hit tester stuff
         //
-        function gotoSanFran(){
-            var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
-            camera.setAltitude(800);
-            camera.setLatitude(37.79);
-            camera.setLongitude(-122.396); 
-            ge.getView().setAbstractView(camera);
-        }
        
         var heights
         var samples 
@@ -100,7 +93,6 @@
 
 <div id="map3d" style="height: 600px; width: 600px;"></div>
 <div id="resultsDiv"></div>
-    <div id="layers"></div>
 
 <canvas id="canv32" width='600' height='600'></canvas>
 </body>

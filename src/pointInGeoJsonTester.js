@@ -4,8 +4,6 @@
   Make a map for wuickly hit testing building footprints
 
 
-
-
 */
 var pointInGeojsonTester = function(jsonObject, options) {
   var this2 = this
@@ -18,7 +16,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
   }
 
   this.features = [];
-
+  this.jsonObject = jsonObject
   this.xMin = Number.MAX_VALUE
   this.xMax = Number.MIN_SAFE_INTEGER
   this.yMin = Number.MAX_VALUE
@@ -36,12 +34,12 @@ var pointInGeojsonTester = function(jsonObject, options) {
   this.init = function() {
     var features = []
     var evacPoint = null;
-    if( jsonObject && (jsonObject['type'] == 'FeatureCollection' ) ){
-       features = jsonObject['features']
+    if( this.jsonObject && (this.jsonObject['type'] == 'FeatureCollection' ) ){
+       features = this.jsonObject['features']
     }
     else {
-      for (var i in jsonObject) {
-        var ft = jsonObject[i];
+      for (var i in this.jsonObject) {
+        var ft = this.jsonObject[i];
         if (ft.type && ft.type == 'FeatureCollection') {
           for (var j in ft.features) {
             var ft2 = ft.features[j]
@@ -80,12 +78,12 @@ var pointInGeojsonTester = function(jsonObject, options) {
   this.latlon2CanXY = function(lat,lon) {
     x = (lon - this2.xMin) * (this2.canvas.width / (this2.xMax - this2.xMin))
     y = (lat - this2.yMin) * (this2.canvas.height / (this2.yMax - this2.yMin))
-    return [x,y]
+    return [x,this2.canvas.height-y]
   }
 
   this.canXY2LatLon = function(x,y) {
     var lon = x / (this2.canvas.width / (this2.xMax - this2.xMin)) + this2.xMin
-    var lat = y / (this2.canvas.height / (this2.yMax - this2.yMin)) + this2.yMin
+    var lat = (this2.canvas.height-y) / (this2.canvas.height / (this2.yMax - this2.yMin)) + this2.yMin
     return [lat,lon]
   }
 
@@ -106,11 +104,11 @@ var pointInGeojsonTester = function(jsonObject, options) {
   }
 
   this.rgb2Index = function(r,g,b) {
-    return  g * 256 + b;
+    return  r*256*256 + g * 256 + b;
   }
 
   this.index2rgb = function( index) {
-    var r = 255
+    var r = n >> 16
     var g = n >> 8
     var b = n % 256
     return [r,g,b]
@@ -122,6 +120,14 @@ var pointInGeojsonTester = function(jsonObject, options) {
       return null
     }
     return this.features[index-1]//the indexes start at one but the features are zero indexed
+  }
+
+  this.featureOfCanXY = function(x,y) {
+    var index = this.indexOfCanvasXY(x,y)
+    if (!index) {
+      return null
+    }
+    return this.features[index]//the indexes start at one but the features are zero indexed
   }
 
   function traverseCoordinates(coordinates, type) {
@@ -185,6 +191,16 @@ var pointInGeojsonTester = function(jsonObject, options) {
       centroidsLatLon[i] = this.canXY2LatLon(mean[0], mean[1])
     }
     return {centroidsLatLon:centroidsLatLon, centroids:centroids}
+  }
+
+  this.centroids2properties = function() {
+    var cents = this.calcCentroids()
+    for(var i in cents.centroidsLatLon){
+      if(this.features[i] && this.features[i].properties){
+        this.features[i].properties.clat = cents.centroidsLatLon[i][0]
+        this.features[i].properties.clon = cents.centroidsLatLon[i][1]
+      }
+    }
   }
 
   

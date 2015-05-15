@@ -2,6 +2,8 @@
 <head>
 <script src="./src/pointInGeoJsonTester.js"></script>
 <script src="./bower_components/jstat/dist/jstat.js"></script>
+<script>exports = {}//required for the hilbert curve library</script>
+<script src="./bower_components/hilbert-js/hilbert2d.js"></script>
 <script>
 
 var geoJsonLookup
@@ -32,10 +34,32 @@ function loadFootPrints(url) {
       var jsn = JSON.parse(response)
       console.log(jsn)
       geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:800})
-      document.body.appendChild( geoJsonLookup.canvas)
+      document.getElementById('can').appendChild( geoJsonLookup.canvas)
+      geoJsonLookup.canvas.id = "geojson-canvas"
+      geoJsonLookup.centroids2properties()
+      geoJsonLookup.canvas.onmousemove = mousemover
     }).catch(function(error) {
       console.error("Failed", error);
     });
+
+    var mousemover =  function(e){
+      //console.log(e)
+      var bb = this.getBoundingClientRect()
+      //console.log(bb)
+      var x = e.clientX - bb.left
+      var y = e.clientY - bb.top
+      var feat = geoJsonLookup.featureOfCanXY(x,y)
+      var indx = geoJsonLookup.indexOfCanvasXY(x,y)
+      var dv=document.getElementById('results')
+      if( feat){
+        var prop=feat.properties
+        dv.innerHTML = "index: "+indx+"centroid: " + prop.clat +","+prop.clon + ' , height: ' + prop.height
+        dv.innerHTML += " base:" + prop.base
+      }else{
+        dv.innerHTML = "None"
+      }
+      // /console.log( geoJsonLookup.featureOfCanXY(x,y))
+    }
 }
 
 
@@ -43,6 +67,8 @@ loadFootPrints('./data/sanfran-bldgout-4326.min.json')
 </script>
 </head>
 <body>
+<div id="results"></div>
+<div id="can"></div>
 </body>
 </html>
 

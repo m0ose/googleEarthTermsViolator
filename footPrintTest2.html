@@ -2,6 +2,12 @@
 <head>
 <script src="./src/pointInGeoJsonTester.js"></script>
 <script src="./bower_components/jstat/dist/jstat.js"></script>
+<script src="https://www.google.com/jsapi?key=ABQIAAAADyG-Is-nbf-mhbZu3jEfJhT2yXp_ZAY8_ufC3CFXhHIE1NvwkxTIxKYNH__thZKWla5gV347ZcL5VA"></script>
+<script src="./src/initEarth.js"></script>
+<script src="./src/utilsEarth.js"></script>
+<script src="./src/miscUtils.js"></script>
+<title>Altitude Scan</title>
+
 <script>
 
 var geoJsonLookup
@@ -31,20 +37,51 @@ function loadFootPrints(url) {
       //console.log("Success!", response);
       var jsn = JSON.parse(response)
       console.log(jsn)
-      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:800})
-      document.body.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:400})
+      geoJsonLookup.centroids2properties()
+      document.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
+      geoJsonLookup.canvas.onmousemove = mousemover
     }).catch(function(error) {
       console.error("Failed", error);
     });
+
+     var mousemover =  function(e){
+      //console.log(e)
+      var bb = this.getBoundingClientRect()
+      //console.log(bb)
+      var x = e.clientX - bb.left
+      var y = e.clientY - bb.top
+      var feat = geoJsonLookup.featureOfCanXY(x,y)
+      var indx = geoJsonLookup.indexOfCanvasXY(x,y)
+      var dv=document.getElementById('results')
+      if( feat){
+        var prop=feat.properties
+        dv.innerHTML = "index: "+indx+"centroid: " + prop.clat +","+prop.clon + ' , height: ' + prop.height
+        gotoLatLon(prop.clat, prop.clon,1000)
+      }else{
+        dv.innerHTML = "None"
+      }
+      // /console.log( geoJsonLookup.featureOfCanXY(x,y))
+    }
 }
 
 
+///
+//
+//  Google earth stuff
+//
 
-loadFootPrints('./data/sanfran-bldgout-4326.min.json')
+setTimeout( function(){      ge.getOptions().setFlyToSpeed(4)
+},3000)
 </script>
 </head>
-<body>
+<body onload="loadFootPrints('./data/sanfran-bldgout-4326.min.json')">
+<button onclick="gotoSanFran()">fly to san fransisco</button>
+<button onclick="altitudeScan()">start scan</button>
+<button onclick="stopScan()">stop scan</button>
 
+<div id="map3d" style="height: 200px; width: 600px;"></div>
+<div id="results"></div>
 <div id='foot-can'></div>
 </body>
 </html>

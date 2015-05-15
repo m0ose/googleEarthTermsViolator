@@ -39,3 +39,19 @@ function batchShot(x,y,width,height,step) {
     google.earth.executeBatch( ge, funky)
     return result
 }
+
+function gotoLatLon(lat, lon, alt){
+    var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
+    camera.setAltitude(alt || 800);
+    camera.setLatitude(lat);
+    camera.setLongitude(lon); 
+    ge.getView().setAbstractView(camera);
+}
+
+function gotoSanFran(){
+    var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
+    camera.setAltitude(1200);
+    camera.setLatitude(37.79);
+    camera.setLongitude(-122.396); 
+    ge.getView().setAbstractView(camera);
+}
