@@ -1,0 +1,57 @@
+<html>
+<head>
+<script src="./src/pointInGeoJsonTester.js"></script>
+<script src="./bower_components/jstat/dist/jstat.js"></script>
+<script>
+
+var geoJsonLookup
+
+function getUrl(url) {
+  return new Promise(function(resolve, reject) {
+    var req = new XMLHttpRequest();
+    req.open('GET', url);
+    req.onload = function() {
+      if (req.status == 200) {
+        // Resolve the promise with the response text
+        resolve(req.response);
+      }
+      else {
+        reject(Error(req.statusText));
+      }
+    };
+    req.onerror = function() {
+      reject(Error("Network Error"));
+    };
+    req.send();
+  });
+}
+
+function loadFootPrints(url) {
+    getUrl(url).then(function(response) {
+      //console.log("Success!", response);
+      var jsn = JSON.parse(response)
+      console.log(jsn)
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:800})
+      document.body.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
+    }).catch(function(error) {
+      console.error("Failed", error);
+    });
+}
+
+
+
+loadFootPrints('./data/sanfran-bldgout-4326.min.json')
+</script>
+</head>
+<body>
+
+<div id='foot-can'></div>
+</body>
+</html>
+
+
+
+
+
+
+
