@@ -1,0 +1,186 @@
+<html>
+<head>
+<script src="./src/pointInGeoJsonTester.js"></script>
+<script src="./bower_components/jstat/dist/jstat.js"></script>
+<script src="./bower_components/squareBins/squareBins.js"></script>
+<script src="http://underscorejs.org/underscore-min.js"></script>
+
+<script src="https://www.google.com/jsapi?key=ABQIAAAADyG-Is-nbf-mhbZu3jEfJhT2yXp_ZAY8_ufC3CFXhHIE1NvwkxTIxKYNH__thZKWla5gV347ZcL5VA"></script>
+<script src="./src/initEarth.js"></script>
+<script src="./src/utilsEarth.js"></script>
+<script src="./src/miscUtils.js"></script>
+<title>Altitude Scan</title>
+
+<script>
+
+var geoJsonLookup
+var continueScan = true
+
+ function stopScan() {
+            continueScan = false
+        }
+
+function getUrl(url) {
+  return new Promise(function(resolve, reject) {
+    var req = new XMLHttpRequest();
+    req.open('GET', url);
+    req.onload = function() {
+      if (req.status == 200) {
+        // Resolve the promise with the response text
+        resolve(req.response);
+      }
+      else {
+        reject(Error(req.statusText));
+      }
+    };
+    req.onerror = function() {
+      reject(Error("Network Error"));
+    };
+    req.send();
+  });
+}
+
+function loadFootPrints(url) {
+    getUrl(url).then(function(response) {
+      //console.log("Success!", response);
+      var jsn = JSON.parse(response)
+      console.log(jsn)
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:500})
+      geoJsonLookup.centroids2properties()
+      document.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
+      geoJsonLookup.canvas.onmousemove = mousemover
+    }).catch(function(error) {
+      console.error("Failed", error);
+    });
+
+     var mousemover =  function(e){
+      //console.log(e)
+      var bb = this.getBoundingClientRect()
+      //console.log(bb)
+      var x = e.clientX - bb.left
+      var y = e.clientY - bb.top
+      var feat = geoJsonLookup.featureOfCanXY(x,y)
+      var indx = geoJsonLookup.indexOfCanvasXY(x,y)
+      // /console.log( geoJsonLookup.featureOfCanXY(x,y))
+    }
+}
+
+
+///
+//
+//  Google earth stuff
+//
+
+function enqueFootPrintsSample(lookup) {
+  var queue = []
+  var bins
+  var jsonSamples = lookup.calcCentroids()
+  bins = new squareBins({minX:lookup.xMin, maxX:lookup.xMax, minY:lookup.yMin, maxY:lookup.yMax, width:12, height:12})
+  for(var i in jsonSamples.allPoints) {
+    var sampCount = Math.min(50, jsonSamples.allPointsLatLon[i].length/6)
+    sampCount = Math.max(10, sampCount)
+    randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
+    for(var j=0; j<randSamp.length; j++) {
+      bins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
+    }
+  }
+  var count = 0
+  bins.forEachBin_left2right( function(p, binx, biny){
+    var cxy = bins.binxy2xy(binx+0.5, biny+0.5)
+    queue.push({move:cxy})
+    p.forEach( function(v){
+      queue.push(v)
+    })
+    count++
+  })
+  return queue
+}
+
+var myqueue
+function runSequence() {
+  myqueue = enqueFootPrintsSample( geoJsonLookup)
+  ge.getOptions().setFlyToSpeed(4)
+  processNext()
+  continueScan = true
+}
+
+finalHeights = []
+drawThese = []
+function processNext() {
+  var move
+  var batch = []
+  var dims = getEarthDimensions()
+  for(var i=0; i < 400; i++) {
+    a = myqueue.shift()
+    if( a.move) {
+      move = a
+      break;
+    } else {
+      var sx = scaleValue(dims.ul.x, a.x, dims.lr.x,0,dims.div.width)
+      var sy = scaleValue(dims.lr.y, a.y, dims.ul.y,dims.div.height,0)
+      //console.log(a.x,a.y,sx,sy)
+      batch.push([sx,sy])
+    }
+  }
+  //console.log('batch', batch)
+  if(batch.length>0) {
+    var sample = listShot(batch)
+    finalHeights = finalHeights.concat(sample)
+    drawThese = drawThese.concat(sample)
+    //console.log('ge batch list',sample)
+  }
+  if( !continueScan){
+
+  } else if(move) {
+    gotoLatLon(move.move[1], move.move[0], 1500)
+    drawHeights()
+    setTimeout(processNext, 500)
+  }else{
+    setTimeout(processNext, 100)
+  }
+}
+
+
+function drawHeights(){
+  var can = document.getElementById('foot-can').getElementsByTagName('canvas')[0]
+  var ctx = can.getContext('2d')
+  var wid = can.width
+  var hei = can.height
+  while(drawThese.length > 0){
+    var sam = drawThese.pop()
+    var alt = NaN
+    if( sam.globe){ alt = sam.globe}
+    if( sam.terrain){ alt = sam.terrain}
+    if( sam.buildings){ alt = sam.buildings}
+    if( alt){
+      var x=scaleValue(geoJsonLookup.xMin, alt.x, geoJsonLookup.xMax, 0, wid)
+      var y=scaleValue(geoJsonLookup.yMin, alt.y, geoJsonLookup.yMax, hei,0)
+      var rgb = HSVtoRGB(1-alt.a/600, 1, 0.5)
+      //console.log(x,y, geoJsonLookup.yMin, alt.y, geoJsonLookup.yMax, 0, hei)
+
+      ctx.fillStyle = "rgb("+Math.floor(rgb.r)+","+Math.floor(rgb.g)+","+Math.floor(rgb.b) +")"
+      ctx.fillRect(x-2,y-2,4,4)
+    }
+  }
+  //console.log(ctx.fillStyle, tmp)
+}
+
+</script>
+</head>
+<body onload="loadFootPrints('./data/sanfran-bldgout-4326.min.json')">
+<button onclick="gotoSanFran()">fly to san fransisco</button>
+<button onclick="runSequence()">start scan</button>
+<button onclick="stopScan()">stop scan</button>
+
+<div id="map3d" style="height: 200px; width: 600px;"></div>
+<div id="results"></div>
+<div id='foot-can'></div>
+</body>
+</html>
+
+
+
+
+
+
+

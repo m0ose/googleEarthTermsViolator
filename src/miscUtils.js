@@ -23,3 +23,11 @@ function HSVtoRGB(h, s, v) {
         b: Math.floor(b * 255)
     };
 }
+
+var scaleValue = function(minIn, val, maxIn, minOut, maxOut) {
+    var rangeIn = maxIn - minIn
+    var a = (val-minIn)/rangeIn
+    var rangeOut = maxOut - minOut
+    var b = a*rangeOut + minOut
+    return b
+}

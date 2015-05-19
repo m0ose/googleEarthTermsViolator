@@ -24,12 +24,15 @@ var pointInGeojsonTester = function(jsonObject, options) {
   var n = 1;
 
   this.canvas = document.createElement('canvas')
-  this.canvas.width = this.width;
-  this.canvas.height = this.height;
+  this.canvas.width = this.width
+  this.canvas.height = this.height
   this.ctx = this.canvas.getContext('2d')
+  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+
   this.imgdata = null;
-  this.ctx.fillStyle = "#000"
-  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+
+  //this.ctx.fillStyle = "#000"
+  //this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
   this.init = function() {
     var features = []
@@ -97,9 +100,13 @@ var pointInGeojsonTester = function(jsonObject, options) {
       return null
     }
     var index = 4 * Math.round(Math.round(y) * this.canvas.width + Math.round(x))
+    var r = this.imgdata.data[index ]
     var g = this.imgdata.data[index + 1]
     var b = this.imgdata.data[index + 2]
-    var index2 = this.rgb2Index(0,g,b)
+    var a = this.imgdata.data[index + 3]
+
+    var index2 = this.rgb2Index(r,g,b)
+    if(a<255){return null}
     return index2;
   }
 
@@ -119,7 +126,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
     if (!index) {
       return null
     }
-    return this.features[index-1]//the indexes start at one but the features are zero indexed
+    return this.features[index]//the indexes start at one but the features are zero indexed
   }
 
   this.featureOfCanXY = function(x,y) {
@@ -137,7 +144,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
     var g = rgb[1]
     var b = rgb[2]
     ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')'
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 0;
     if (type == 'bounds') {
       for (var j = 0; j < coordinates.length; j++) {
         var x = coordinates[j][0];
@@ -163,12 +170,12 @@ var pointInGeojsonTester = function(jsonObject, options) {
         }
       }
     }
-    ctx.stroke();
     ctx.fill();
   }
 
   this.calcCentroids = function() {
     var tab = []
+    var tabsLatLon = []
     var centroids = []
     var centroidsLatLon = []
     var ctx = this.canvas.getContext('2d')
@@ -182,15 +189,17 @@ var pointInGeojsonTester = function(jsonObject, options) {
       var index = this.rgb2Index(r,g,b)
       if( !tab[index]) {
         tab[index]=[]
+        tabsLatLon[index]=[]
       }
       tab[index].push([x,y])
+      tabsLatLon[index].push(this.canXY2LatLon(x,y))
     }
     for(i=0; i<tab.length; i++){
       var mean = jStat(tab[i]).mean()
       centroids[i] = mean
       centroidsLatLon[i] = this.canXY2LatLon(mean[0], mean[1])
     }
-    return {centroidsLatLon:centroidsLatLon, centroids:centroids}
+    return {allPoints:tab, allPointsLatLon:tabsLatLon, centroidsLatLon:centroidsLatLon, centroids:centroids}
   }
 
   this.centroids2properties = function() {

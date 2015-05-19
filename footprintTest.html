@@ -2,8 +2,11 @@
 <head>
 <script src="./src/pointInGeoJsonTester.js"></script>
 <script src="./bower_components/jstat/dist/jstat.js"></script>
-<script>exports = {}//required for the hilbert curve library</script>
+<script src="./bower_components/squareBins/squareBins.js"></script>
+<script src="http://underscorejs.org/underscore-min.js"></script>
+<!--<script>exports = {}//required for the hilbert curve library</script>
 <script src="./bower_components/hilbert-js/hilbert2d.js"></script>
+-->
 <script>
 
 var geoJsonLookup
@@ -62,6 +65,22 @@ function loadFootPrints(url) {
     }
 }
 
+//
+var bins
+function lookAtFootPrints(lookup) {
+  var jsonSamples = lookup.calcCentroids()
+  bins = new squareBins({minX:lookup.xMin-0.001, maxX:lookup.xMax+0.001, minY:lookup.yMin-0.001, maxY:lookup.yMax+0.001, width:40, height:40})
+  var randSamp 
+  for(var i in jsonSamples.allPoints) {
+    var sampCount = Math.min(60, jsonSamples.allPointsLatLon[i].length/4)
+    randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
+    //console.log(randSamp)
+    for(var j=0; j<randSamp.length; j++) {
+      bins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
+    }
+  }
+  console.log(randSamp)
+}
 
 loadFootPrints('./data/sanfran-bldgout-4326.min.json')
 </script>

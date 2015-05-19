@@ -6,16 +6,16 @@ function singleShot( x,y) {
     var hitFu = ge.getView().hitTest(x, ge.UNITS_PIXELS, y, ge.UNITS_PIXELS, 3)//not sure what this on is?
     var result = {x:x, y:y}
     if( hitGlobe){
-        result.globe = {x:hitGlobe.getLatitude(), y:hitGlobe.getLongitude(), a:hitGlobe.getAltitude()}
+        result.globe = {y:hitGlobe.getLatitude(), x:hitGlobe.getLongitude(), a:hitGlobe.getAltitude()}
     }
     if( hitTerrain){
-        result.terrain = {x:hitTerrain.getLatitude(), y:hitTerrain.getLongitude(), a:hitTerrain.getAltitude()}
+        result.terrain = {y:hitTerrain.getLatitude(), x:hitTerrain.getLongitude(), a:hitTerrain.getAltitude()}
     }
     if( hitBuildings){
-        result.buildings = {x:hitBuildings.getLatitude(), y:hitBuildings.getLongitude(), a:hitBuildings.getAltitude()}
+        result.buildings = {y:hitBuildings.getLatitude(), x:hitBuildings.getLongitude(), a:hitBuildings.getAltitude()}
     }
     if(hitFu){
-        result.fu = {x:hitFu.getLatitude(), y:hitFu.getLongitude(), a:hitFu.getAltitude()}
+        result.fu = {y:hitFu.getLatitude(), x:hitFu.getLongitude(), a:hitFu.getAltitude()}
     }
     return result
 }
@@ -40,6 +40,19 @@ function batchShot(x,y,width,height,step) {
     return result
 }
 
+function listShot(list) {
+    var result = []
+    var funky = function(){
+        for(var i=0; i < list.length; i++) {
+            var x = list[i][0]
+            var y = list[i][1]
+            result.push( singleShot(x,y))
+        }
+    }
+    google.earth.executeBatch( ge, funky)
+    return result
+}
+
 function gotoLatLon(lat, lon, alt){
     var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
     camera.setAltitude(alt || 800);
@@ -54,4 +67,12 @@ function gotoSanFran(){
     camera.setLatitude(37.79);
     camera.setLongitude(-122.396); 
     ge.getView().setAbstractView(camera);
+}
+
+function getEarthDimensions() {
+    var dv = document.getElementById('map3d')
+    var a = dv.getBoundingClientRect()
+    var ul = singleShot(0,0)
+    var lr = singleShot(a.width, a.height)
+    return({div:a, ul:ul.globe, lr:lr.globe})
 }
