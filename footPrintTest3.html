@@ -15,10 +15,11 @@
 
 var geoJsonLookup
 var continueScan = true
+var gAltitude = 1200
 
  function stopScan() {
-            continueScan = false
-        }
+      continueScan = false
+  }
 
 function getUrl(url) {
   return new Promise(function(resolve, reject) {
@@ -48,29 +49,16 @@ function loadFootPrints(url) {
       geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:500})
       geoJsonLookup.centroids2properties()
       document.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
-      geoJsonLookup.canvas.onmousemove = mousemover
+      geoJsonLookup.canvas.style.cssText = "height:300px; width:600px;"
     }).catch(function(error) {
       console.error("Failed", error);
     });
-
-     var mousemover =  function(e){
-      //console.log(e)
-      var bb = this.getBoundingClientRect()
-      //console.log(bb)
-      var x = e.clientX - bb.left
-      var y = e.clientY - bb.top
-      var feat = geoJsonLookup.featureOfCanXY(x,y)
-      var indx = geoJsonLookup.indexOfCanvasXY(x,y)
-      // /console.log( geoJsonLookup.featureOfCanXY(x,y))
-    }
 }
-
 
 ///
 //
 //  Google earth stuff
 //
-
 function enqueFootPrintsSample(lookup) {
   var queue = []
   var bins
@@ -85,7 +73,7 @@ function enqueFootPrintsSample(lookup) {
     }
   }
   var count = 0
-  bins.forEachBin_left2right( function(p, binx, biny){
+  bins.forEachBin_zigzag( function(p, binx, biny){
     var cxy = bins.binxy2xy(binx+0.5, biny+0.5)
     queue.push({move:cxy})
     p.forEach( function(v){
@@ -99,17 +87,17 @@ function enqueFootPrintsSample(lookup) {
 var myqueue
 function runSequence() {
   myqueue = enqueFootPrintsSample( geoJsonLookup)
-  ge.getOptions().setFlyToSpeed(4)
+  ge.getOptions().setFlyToSpeed(6)
   processNext()
   continueScan = true
 }
 
-finalHeights = []
-drawThese = []
+g_finalHeights = []
+g_drawThese = []
 function processNext() {
   var move
   var batch = []
-  var dims = getEarthDimensions()
+  var dims = earthUtils.getEarthDimensions()
   for(var i=0; i < 400; i++) {
     a = myqueue.shift()
     if( a.move) {
@@ -118,30 +106,27 @@ function processNext() {
     } else {
       var sx = scaleValue(dims.ul.x, a.x, dims.lr.x,0,dims.div.width)
       var sy = scaleValue(dims.lr.y, a.y, dims.ul.y,dims.div.height,0)
-      //console.log(a.x,a.y,sx,sy)
       batch.push([sx,sy])
     }
   }
-  //console.log('batch', batch)
   if(batch.length>0) {
-    var sample = listShot(batch)
-    finalHeights = finalHeights.concat(sample)
-    drawThese = drawThese.concat(sample)
-    //console.log('ge batch list',sample)
+    var sample = earthUtils.listShot(batch)
+    g_finalHeights = g_finalHeights.concat(sample)
+    g_drawThese = g_drawThese.concat(sample)
   }
   if( !continueScan){
 
   } else if(move) {
-    gotoLatLon(move.move[1], move.move[0], 1500)
-    drawHeights()
+    earthUtils.gotoLatLon(move.move[1], move.move[0], gAltitude)
+    //moveBaloon(move.move[1], move.move[0])
+    drawHeights(g_drawThese)
     setTimeout(processNext, 500)
   }else{
     setTimeout(processNext, 100)
   }
 }
 
-
-function drawHeights(){
+function drawHeights( drawThese){
   var can = document.getElementById('foot-can').getElementsByTagName('canvas')[0]
   var ctx = can.getContext('2d')
   var wid = can.width
@@ -155,14 +140,11 @@ function drawHeights(){
     if( alt){
       var x=scaleValue(geoJsonLookup.xMin, alt.x, geoJsonLookup.xMax, 0, wid)
       var y=scaleValue(geoJsonLookup.yMin, alt.y, geoJsonLookup.yMax, hei,0)
-      var rgb = HSVtoRGB(1-alt.a/600, 1, 0.5)
-      //console.log(x,y, geoJsonLookup.yMin, alt.y, geoJsonLookup.yMax, 0, hei)
-
+      var rgb = HSVtoRGB(0.2+alt.a/400, 1, 0.5)
       ctx.fillStyle = "rgb("+Math.floor(rgb.r)+","+Math.floor(rgb.g)+","+Math.floor(rgb.b) +")"
       ctx.fillRect(x-2,y-2,4,4)
     }
   }
-  //console.log(ctx.fillStyle, tmp)
 }
 
 </script>
@@ -170,9 +152,8 @@ function drawHeights(){
 <body onload="loadFootPrints('./data/sanfran-bldgout-4326.min.json')">
 <button onclick="gotoSanFran()">fly to san fransisco</button>
 <button onclick="runSequence()">start scan</button>
-<button onclick="stopScan()">stop scan</button>
-
-<div id="map3d" style="height: 200px; width: 600px;"></div>
+<button onclick="stopScan()">cancel scan</button>
+<div id="map3d" style="height: 400px; width: 600px;"></div>
 <div id="results"></div>
 <div id='foot-can'></div>
 </body>

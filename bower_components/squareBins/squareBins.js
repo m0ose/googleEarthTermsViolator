@@ -97,7 +97,7 @@ function squareBins(options) {
         if(y%2 == 1) { 
           x2 = this.bins.length - x - 1
         }
-        cb(this.bins[x2][y],x,y)
+        cb(this.bins[x2][y],x2,y)
       }
     }
   }

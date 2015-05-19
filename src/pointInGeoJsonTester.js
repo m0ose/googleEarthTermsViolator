@@ -96,6 +96,19 @@ var pointInGeojsonTester = function(jsonObject, options) {
   }
 
   this.indexOfCanvasXY = function(x, y) {
+    var ul = this.indexOfCanvasXY_singlePoint(x-1,y+1)
+    var ur = this.indexOfCanvasXY_singlePoint(x+1,y+1)
+    var ll = this.indexOfCanvasXY_singlePoint(x+1,y-1)
+    var lr = this.indexOfCanvasXY_singlePoint(x-1,y-1)
+    var me = this.indexOfCanvasXY_singlePoint(x,y)
+
+    if( ul == ur == ll == lr == me) {
+      return me
+    }
+    return null
+  }
+
+  this.indexOfCanvasXY_singlePoint = function(x, y) {
     if (x > this.canvas.width || x < 0 || y > this.canvas.height || y < 0) {
       return null
     }

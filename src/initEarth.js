@@ -16,7 +16,7 @@ function initCB(instance)
     ge.getOptions().setFadeInOutEnabled(false);
     ge.getOptions().setFlyToSpeed(ge.SPEED_TELEPORT);
     // i think for this we want both terrain and buildings on. Building without terrain is sketchy. and terrain only doesn't show buildings
-    ge.getLayerRoot().enableLayerById(ge.LAYER_BUILDINGS, true);
+    ge.getLayerRoot().enableLayerById(ge.LAYER_BUILDINGS, false);
     ge.getLayerRoot().enableLayerById(ge.LAYER_TERRAIN, true);
     startHitTester()
 }
