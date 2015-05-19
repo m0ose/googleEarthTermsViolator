@@ -31,3 +31,23 @@ var scaleValue = function(minIn, val, maxIn, minOut, maxOut) {
     var b = a*rangeOut + minOut
     return b
 }
+
+function arrayMin(arr) {
+  var len = arr.length, min = Infinity;
+  while (len--) {
+    if (arr[len] < min && arr[len]>0) {
+      min = arr[len];
+    }
+  }
+  return min;
+};
+
+function arrayMax(arr) {
+  var len = arr.length, max = -Infinity;
+  while (len--) {
+    if (arr[len] > max) {
+      max = arr[len];
+    }
+  }
+  return max;
+};

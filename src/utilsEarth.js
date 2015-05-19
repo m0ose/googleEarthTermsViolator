@@ -50,7 +50,11 @@ earthUtils = new function() {
             for(var i=0; i < list.length; i++) {
                 var x = list[i][0]
                 var y = list[i][1]
-                result.push( singleShot(x,y))
+                var resobj = {shot:singleShot(x,y)}
+                if( list[i].length>2){
+                    resobj.data = list[i][2]
+                }
+                result.push(resobj)
             }
         }
         google.earth.executeBatch( ge, funky)

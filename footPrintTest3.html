@@ -104,6 +104,7 @@ function processNext() {
       move = a
       break;
     } else {
+      //convert lat lon to google earth plugin screen coords
       var sx = scaleValue(dims.ul.x, a.x, dims.lr.x,0,dims.div.width)
       var sy = scaleValue(dims.lr.y, a.y, dims.ul.y,dims.div.height,0)
       batch.push([sx,sy,a])
@@ -115,7 +116,7 @@ function processNext() {
     g_drawThese = g_drawThese.concat(sample)
   }
   if( !continueScan){
-
+    //do nothing
   } else if(move) {
     earthUtils.gotoLatLon(move.move[1], move.move[0], gAltitude)
     //moveBaloon(move.move[1], move.move[0])
@@ -134,9 +135,9 @@ function drawHeights( drawThese){
   while(drawThese.length > 0){
     var sam = drawThese.pop()
     var alt = NaN
-    if( sam.globe){ alt = sam.globe}
-    if( sam.terrain){ alt = sam.terrain}
-    if( sam.buildings){ alt = sam.buildings}
+    if( sam.shot.globe){ alt = sam.shot.globe}
+    if( sam.shot.terrain){ alt = sam.shot.terrain}
+    if( sam.shot.buildings){ alt = sam.shot.buildings}
     if( alt){
       var x=scaleValue(geoJsonLookup.xMin, alt.x, geoJsonLookup.xMax, 0, wid)
       var y=scaleValue(geoJsonLookup.yMin, alt.y, geoJsonLookup.yMax, hei,0)
@@ -150,7 +151,7 @@ function drawHeights( drawThese){
 </script>
 </head>
 <body onload="loadFootPrints('./data/sanfran-bldgout-4326.min.json')">
-<button onclick="gotoSanFran()">fly to san fransisco</button>
+<button onclick="earthUtils.gotoSanFran()">fly to san fransisco</button>
 <button onclick="runSequence()">start scan</button>
 <button onclick="stopScan()">cancel scan</button>
 <div id="map3d" style="height: 400px; width: 600px;"></div>

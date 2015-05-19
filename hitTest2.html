@@ -78,8 +78,8 @@
             can.height = scanDims[1]
             var ctx = can.getContext('2d')
             var imgd = ctx.getImageData(0,0,can.width, can.height)
-            var minH = heights[heights.indexOf(Math.min.apply(Math, heights))]
-            var maxH = heights[heights.indexOf(Math.max.apply(Math, heights))]
+            var minH = arrayMin(heights)
+            var maxH = arrayMax(heights)
             var range = maxH-minH
             for(var i=0; i< heights.length; i++){
                 var h = heights[i]

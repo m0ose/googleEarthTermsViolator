@@ -1,7 +1,7 @@
 /*
 
 
-  Make a map for wuickly hit testing building footprints
+  Make a map for quickly hit testing building footprints
 
 
 */
