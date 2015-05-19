@@ -46,7 +46,7 @@
             var sp = scanProgress
             //console.log('before',Number(sp[0]),Number(sp[1]))
             var dims = scanDims
-            var sample = batchShot(sp[0], sp[1], step, step,2)
+            var sample = earthUtils.batchShot(sp[0], sp[1], step, step,2)
             samples = samples.concat(sample)
             for(var i=0; i<sample.length; i++) {
                 var sam = sample[i]
@@ -101,7 +101,7 @@
 
 </head>
 <body>
-<button onclick="gotoSanFran()">fly to san fransisco</button>
+<button onclick="earthUtils.gotoSanFran()">fly to san fransisco</button>
 <button onclick="altitudeScan()">start scan</button>
 <button onclick="stopScan()">stop scan</button>
 

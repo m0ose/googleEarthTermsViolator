@@ -106,7 +106,7 @@ function processNext() {
     } else {
       var sx = scaleValue(dims.ul.x, a.x, dims.lr.x,0,dims.div.width)
       var sy = scaleValue(dims.lr.y, a.y, dims.ul.y,dims.div.height,0)
-      batch.push([sx,sy])
+      batch.push([sx,sy,a])
     }
   }
   if(batch.length>0) {
