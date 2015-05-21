@@ -1,0 +1,165 @@
+<html>
+<head>
+<script src="./src/pointInGeoJsonTester.js"></script>
+<script src="./bower_components/jstat/dist/jstat.js"></script>
+<script src="./bower_components/squareBins/squareBins.js"></script>
+<script src="http://underscorejs.org/underscore-min.js"></script>
+<script src="src/getElevationFromServer.js"></script>
+<script src="./src/miscUtils.js"></script>
+
+<!--<script>exports = {}//required for the hilbert curve library</script>
+<script src="./bower_components/hilbert-js/hilbert2d.js"></script>
+-->
+<script>
+
+var geoJsonLookup
+var g_elev
+
+function getUrl(url) {
+  return new Promise(function(resolve, reject) {
+    var req = new XMLHttpRequest();
+    req.open('GET', url);
+    req.onload = function() {
+      if (req.status == 200) {
+        // Resolve the promise with the response text
+        resolve(req.response);
+      }
+      else {
+        reject(Error(req.statusText));
+      }
+    };
+    req.onerror = function() {
+      reject(Error("Network Error"));
+    };
+    req.send();
+  });
+}
+
+function loadFootPrints(url) {
+    getUrl(url).then(function(response) {
+      //console.log("Success!", response);
+      var jsn = JSON.parse(response)
+      console.log(jsn)
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:800})
+      document.getElementById('can').appendChild( geoJsonLookup.canvas)
+      geoJsonLookup.canvas.id = "geojson-canvas"
+      geoJsonLookup.centroids2properties()
+      geoJsonLookup.canvas.onmousemove = mousemover
+    }).catch(function(error) {
+      console.error("Failed", error);
+    })
+
+    var mousemover =  function(e){
+      //console.log(e)
+      var bb = this.getBoundingClientRect()
+      //console.log(bb)
+      var x = e.clientX - bb.left
+      var y = e.clientY - bb.top
+      var feat = geoJsonLookup.featureOfCanXY(x,y)
+      var indx = geoJsonLookup.indexOfCanvasXY(x,y)
+      var dv=document.getElementById('results')
+      if( feat){
+        var d = getStats( feat.properties)
+        tooltip(e.pageX-20,e.pageY+40,d)
+      }else{
+        tooltip(0,0,"none")
+      }
+    }
+}
+
+function getStats( featProps) {
+  var ground = []
+  var terrain = []
+  var build = []
+  if( featProps.hits) {
+    for(var i=0; i < featProps.hits.length; i++) {
+      var hit = featProps.hits[i]
+      ground.push(hit.g)
+      terrain.push(hit.a)
+      build.push(hit.a-hit.g)
+    }
+  }
+  var gmean = jStat.mean(ground)
+  var tmean = jStat.mean(terrain)
+  var bmean = jStat.mean(build)
+  var gstdev = jStat.stdev(ground)
+  var tstdev = jStat.stdev(terrain)
+  var bstdev = jStat.stdev(build)
+  var gmin = jStat.min(ground)
+  var tmin = jStat.min(terrain)
+  var bmin = jStat.min(build)
+  var bmedi = jStat.median(build)
+  var gmax = jStat.max(ground)
+  var tmax = jStat.max(terrain)
+  var bmax = jStat.max(build)
+  //put onto page
+  console.log('building mean,stdev,min,max', bmean, bstdev, bmin, bmax)
+  console.log('ground mean,stdev,min,max', gmean, gstdev, gmin, gmax)
+  console.log('terrainmean,stdev,min,max', tmean, tstdev, tmin, tmax)
+  var str2 = " "
+  str2 = ' accepted height: ' + featProps.height
+  str2 += ' <br> mean height: ' + bmean
+  str2 += ' <br> max: ' + bmax
+  str2 += ' <br> min: ' + bmin
+  str2 += ' <br> stdev: ' + bstdev
+  str2 += ' <br> median: ' + bmedi
+  str2 += ' <br> count: ' + ground.length
+  return str2
+}
+
+function tooltip(x,y,val) {
+  var dv=document.getElementById('results')
+  dv.style.left = x+"px"
+  dv.style.top = y+"px"
+  dv.innerHTML = val
+}
+
+//
+var bins
+function lookAtFootPrints(lookup) {
+  var jsonSamples = lookup.calcCentroids()
+  bins = new squareBins({minX:lookup.xMin-0.001, maxX:lookup.xMax+0.001, minY:lookup.yMin-0.001, maxY:lookup.yMax+0.001, width:40, height:40})
+  var randSamp 
+  for(var i in jsonSamples.allPoints) {
+    var sampCount = Math.min(60, jsonSamples.allPointsLatLon[i].length/4)
+    randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
+    //console.log(randSamp)
+    for(var j=0; j<randSamp.length; j++) {
+      bins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
+    }
+  }
+  console.log(randSamp)
+}
+
+loadFootPrints('./data/sanfran-hitTest-4326.json')
+
+
+drawElevation = function() {
+  var can2 = document.getElementById('can2')
+  var ctx = can2.getContext('2d')
+  for(var x = 0; x<can2.width; x+=2){
+    for(var y=0; y<can2.height; y+=2){
+        var lon=scaleValue(0, x, can2.width, geoJsonLookup.xMin, geoJsonLookup.xMax)
+        var lat=scaleValue(0, y, can2.height, geoJsonLookup.yMin, geoJsonLookup.yMax)
+        var elv = g_elev.queryLatLon(lat,lon)
+        var rgb = HSVtoRGB(0.2+elv/150, 1, 0.5)
+        ctx.fillStyle = "rgb("+rgb.r+","+rgb.g+","+rgb.b+")"
+        ctx.fillRect(x,y,2,2)
+    }
+  }
+}
+</script>
+</head>
+<body>
+<div id="results" style="position:absolute; left:0px; top:0px; background-color:black; color:white;   border-radius: 5px;"></div>
+<div id="can"></div>
+<canvas width=800 height=600 id="can2"></canvas>
+</body>
+</html>
+
+
+
+
+
+
+
