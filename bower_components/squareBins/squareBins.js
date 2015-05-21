@@ -91,7 +91,7 @@ function squareBins(options) {
     |_->_|_->_|_->_|
   */
   this.forEachBin_zigzag = function(cb) {
-    for( var y=0; y<this.bins[0].length; y++) {
+    for( var y=this.bins[0].length-1; y>=0; y--) {
       for(var x=0; x<this.bins.length; x++) {
         var x2 = x
         if(y%2 == 1) { 

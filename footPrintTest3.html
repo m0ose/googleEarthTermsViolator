@@ -17,7 +17,7 @@
 
 var geoJsonLookup
 var continueScan = true
-var gAltitude = 1200
+var gAltitude = 1800
 var g_elev
 g_finalHeights = []
 g_drawThese = []
@@ -52,7 +52,7 @@ function loadFootPrints(url) {
       //console.log("Success!", response);
       var jsn = JSON.parse(response)
       console.log(jsn)
-      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:500})
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:600})
       geoJsonLookup.calcCentroids()
       document.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
       geoJsonLookup.canvas.style.cssText = "height:300px; width:600px;"
@@ -80,7 +80,7 @@ function enqueFootPrintsSample(lookup) {
   var queue = []
   var bins
   var jsonSamples = lookup.calcCentroids()
-  bins = new squareBins({minX:lookup.xMin, maxX:lookup.xMax, minY:lookup.yMin, maxY:lookup.yMax, width:10, height:10})
+  bins = new squareBins({minX:lookup.xMin, maxX:lookup.xMax, minY:lookup.yMin, maxY:lookup.yMax, width:12, height:12})
   for(var i in jsonSamples.allPoints) {
     var sampCount = Math.min(60, jsonSamples.allPointsLatLon[i].length/3)
     sampCount = Math.max(10, sampCount)
