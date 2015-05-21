@@ -107,6 +107,14 @@ earthUtils = new function() {
     }
     this.moveBaloon = moveBaloon
 
+    function latLon2earthXY(lat,lon) {
+      var dims = getEarthDimensions()
+      var sx = scaleValue(dims.ul.x, lon, dims.lr.x,0,dims.div.width)
+      var sy = scaleValue(dims.lr.y, lat, dims.ul.y,dims.div.height,0)
+      return [sx,sy]
+    }
+    this.latLon2earthXY = latLon2earthXY
+
     return this
 }()
 

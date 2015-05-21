@@ -50,4 +50,53 @@ function arrayMax(arr) {
     }
   }
   return max;
-};
+}
+
+//
+// image data stuff
+//
+function getImageCanvas(img){
+     var can = document.createElement('canvas');
+      can.width = img.width;
+      can.height = img.height;
+      var ctx = can.getContext('2d');
+      ctx.drawImage(img,0,0);
+      return ctx
+  }
+
+function convertToImageData( img){
+    if( img.data && img.data instanceof Uint8ClampedArray){//its an image data
+       return img;
+    }
+    else if( img.src ){//its an image
+      return getImageData( img)
+    }
+    else if( img.nodeName && img.nodeName=="CANVAS"){
+      var ctx = img.getContext('2d')
+      var imgData = ctx.getImageData(0,0, img.width, img.height);
+      return imgData
+    }
+  }
+
+function getImageData(img) {
+      if( img.data && img.data instanceof Uint8ClampedArray){
+        return copyImageData(img)
+      }
+      var ctx = getImageCanvas(img)
+      var imgData = ctx.getImageData(0,0, ctx.canvas.width, ctx.canvas.height);
+      return imgData;
+  }
+
+var _RGB2DeciMeters = function(r,g,b){
+    var negative = 1
+    if( r > 63 ){
+       negative = -1
+       r = 0;
+    }
+    var n = negative * (r*256*256 + g*256 + b);
+    n=n/10;
+    return n;
+}
+
+
+

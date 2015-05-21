@@ -4,12 +4,16 @@
 <script src="./bower_components/jstat/dist/jstat.js"></script>
 <script src="./bower_components/squareBins/squareBins.js"></script>
 <script src="http://underscorejs.org/underscore-min.js"></script>
+<script src="src/getElevationFromServer.js"></script>
+<script src="./src/miscUtils.js"></script>
+
 <!--<script>exports = {}//required for the hilbert curve library</script>
 <script src="./bower_components/hilbert-js/hilbert2d.js"></script>
 -->
 <script>
 
 var geoJsonLookup
+var g_elev
 
 function getUrl(url) {
   return new Promise(function(resolve, reject) {
@@ -31,6 +35,19 @@ function getUrl(url) {
   });
 }
 
+function loadElevation(north, south, east, west) {
+  g_elev = new elevationFromServer({north:north, south:south, east:east, west:west}, function(e){
+    if(e){
+      console.warn(e)
+    }else{
+      console.log('success')
+      drawElevation()
+    }
+  })
+}
+
+
+
 function loadFootPrints(url) {
     getUrl(url).then(function(response) {
       //console.log("Success!", response);
@@ -43,7 +60,9 @@ function loadFootPrints(url) {
       geoJsonLookup.canvas.onmousemove = mousemover
     }).catch(function(error) {
       console.error("Failed", error);
-    });
+    }).then(function(){
+      loadElevation( geoJsonLookup.yMax, geoJsonLookup.yMin, geoJsonLookup.xMax, geoJsonLookup.xMin)
+    })
 
     var mousemover =  function(e){
       //console.log(e)
@@ -54,7 +73,15 @@ function loadFootPrints(url) {
       var feat = geoJsonLookup.featureOfCanXY(x,y)
       var indx = geoJsonLookup.indexOfCanvasXY(x,y)
       var dv=document.getElementById('results')
+      if(g_elev && g_elev.loaded) {
+          var lon=scaleValue(0, x, bb.width, geoJsonLookup.xMin, geoJsonLookup.xMax)
+          var lat=scaleValue(0, y, bb.height, geoJsonLookup.yMin, geoJsonLookup.yMax)
+          //console.log(lat,lon)
+          var elv = g_elev.queryLatLon( lat,lon)
+          console.log(elv)
+        }
       if( feat){
+        console.log('.')
         var prop=feat.properties
         dv.innerHTML = "index: "+indx+"centroid: " + prop.clat +","+prop.clon + ' , height: ' + prop.height
         dv.innerHTML += " base:" + prop.base
@@ -83,11 +110,28 @@ function lookAtFootPrints(lookup) {
 }
 
 loadFootPrints('./data/sanfran-bldgout-4326.min.json')
+
+
+drawElevation = function() {
+  var can2 = document.getElementById('can2')
+  var ctx = can2.getContext('2d')
+  for(var x = 0; x<can2.width; x+=2){
+    for(var y=0; y<can2.height; y+=2){
+        var lon=scaleValue(0, x, can2.width, geoJsonLookup.xMin, geoJsonLookup.xMax)
+        var lat=scaleValue(0, y, can2.height, geoJsonLookup.yMin, geoJsonLookup.yMax)
+        var elv = g_elev.queryLatLon(lat,lon)
+        var rgb = HSVtoRGB(0.2+elv/150, 1, 0.5)
+        ctx.fillStyle = "rgb("+rgb.r+","+rgb.g+","+rgb.b+")"
+        ctx.fillRect(x,y,2,2)
+    }
+  }
+}
 </script>
 </head>
 <body>
 <div id="results"></div>
 <div id="can"></div>
+<canvas width=800 height=600 id="can2"></canvas>
 </body>
 </html>
 

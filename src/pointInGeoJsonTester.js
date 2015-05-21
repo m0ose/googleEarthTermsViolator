@@ -102,7 +102,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
     var lr = this.indexOfCanvasXY_singlePoint(x-1,y-1)
     var me = this.indexOfCanvasXY_singlePoint(x,y)
 
-    if( ul == ur == ll == lr == me) {
+    if( me>=0 && (me==ul) && (me==ur) && (me==ll) && (me==lr) ) {
       return me
     }
     return null
@@ -223,6 +223,14 @@ var pointInGeojsonTester = function(jsonObject, options) {
         this.features[i].properties.clon = cents.centroidsLatLon[i][1]
       }
     }
+  }
+
+  this.toGeoJSON = function() {
+    var s={"type": "FeatureCollection",features:[]}
+    for( var i=0; i<this.features.length; i++) {
+      s.features.push( this.features[i]) 
+    }
+    return s
   }
 
   
