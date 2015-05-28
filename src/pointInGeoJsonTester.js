@@ -60,7 +60,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
   }
 
   this.draw = function(geojsonObj, type) {
-    n = 1;
+    n = 0;
     var features = geojsonObj
     for (var i = 0; i < features.length; i++) {
       var coords = features[i].geometry.coordinates;
@@ -69,7 +69,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
         traverseCoordinates(coords[0], type);
       } else if (geomtype == "MultiPolygon") {
         for (var k = 0; k < coords.length; k++) {
-          traverseCoordinates(coords[k][0], type);
+          traverseCoordinates(coords[k][0], type, n);
         }
       }
       //console.log(n);
@@ -150,9 +150,9 @@ var pointInGeojsonTester = function(jsonObject, options) {
     return this.features[index]//the indexes start at one but the features are zero indexed
   }
 
-  function traverseCoordinates(coordinates, type) {
+  function traverseCoordinates(coordinates, type, ndex) {
     var ctx = this2.ctx;
-    var rgb = this2.index2rgb(n)
+    var rgb = this2.index2rgb(ndex)
     var r = rgb[0]
     var g = rgb[1]
     var b = rgb[2]
@@ -194,12 +194,9 @@ var pointInGeojsonTester = function(jsonObject, options) {
     var ctx = this.canvas.getContext('2d')
     var imgd = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height)
     for(var i=0; i<imgd.data.length; i+=4) {
-      var r = imgd.data[i]
-      var g = imgd.data[i+1]
-      var b = imgd.data[i+2]
       var x = (i/4)%this.canvas.width
       var y = Math.floor((i/4)/this.canvas.width)
-      var index = this.rgb2Index(r,g,b)
+      var index = this.indexOfCanvasXY(x,y)
       if( !tab[index]) {
         tab[index]=[]
         tabsLatLon[index]=[]

@@ -6,6 +6,10 @@
 <script src="http://underscorejs.org/underscore-min.js"></script>
 <script src="src/getElevationFromServer.js"></script>
 <script src="./src/miscUtils.js"></script>
+<script src="./bower_components/FileSaver/FileSaver.js"></script>
+<script src="./bower_components/turf/turf.js"></script>
+ <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
+ <script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
 
 <!--<script>exports = {}//required for the hilbert curve library</script>
 <script src="./bower_components/hilbert-js/hilbert2d.js"></script>
@@ -40,11 +44,12 @@ function loadFootPrints(url) {
       //console.log("Success!", response);
       var jsn = JSON.parse(response)
       console.log(jsn)
-      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:800})
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:400, height:400})
       document.getElementById('can').appendChild( geoJsonLookup.canvas)
       geoJsonLookup.canvas.id = "geojson-canvas"
       geoJsonLookup.centroids2properties()
       geoJsonLookup.canvas.onmousemove = mousemover
+      initMap()
     }).catch(function(error) {
       console.error("Failed", error);
     })
@@ -58,13 +63,43 @@ function loadFootPrints(url) {
       var feat = geoJsonLookup.featureOfCanXY(x,y)
       var indx = geoJsonLookup.indexOfCanvasXY(x,y)
       var dv=document.getElementById('results')
-      if( feat){
+      // move map
+      //
+      if( map && gpopup && feat) {
         var d = getStats( feat.properties)
-        tooltip(e.pageX-20,e.pageY+40,d)
-      }else{
-        tooltip(0,0,"none")
+        var ll = new L.LatLng(feat.properties.clat, feat.properties.clon)
+        gpopup.setLatLng(ll)
+        gpopup.setContent(d.str)
+        map.setView(ll)
       }
     }
+}
+
+function getBuildoingStatsCSV() {
+  var feat1 = geoJsonLookup.features[0].properties
+  var stat1 = getStats(feat1)
+  var CSV=""
+  for(var i in stat1.buildings){
+    CSV += i+","
+  }
+  CSV += "mean terrain minus mean ground \n"
+  for(var i=0; i<geoJsonLookup.features.length; i++) {
+    var feat = geoJsonLookup.features[i].properties
+    var stats = getStats(feat)
+    for(var j in stats.buildings ) {
+      var fb = stats.buildings[j] 
+      CSV+= Number(fb).toFixed(6) + ", "
+    }
+    CSV += (stats.terrain.mean-stats.ground.mean).toFixed(6) +"\n"
+  }
+  return CSV
+  //CSV = CSV.slice(0,-1)//get rid of the last comma. Horribly slow
+}
+
+function saveNuildingStats() {
+  var boo = getBuildoingStatsCSV()
+  var blob = new Blob([boo], {type: "text/plain;charset=utf-8"});
+  saveAs(blob,"buildingStats.csv")
 }
 
 function getStats( featProps) {
@@ -79,40 +114,37 @@ function getStats( featProps) {
       build.push(hit.a-hit.g)
     }
   }
-  var gmean = jStat.mean(ground)
-  var tmean = jStat.mean(terrain)
-  var bmean = jStat.mean(build)
-  var gstdev = jStat.stdev(ground)
-  var tstdev = jStat.stdev(terrain)
-  var bstdev = jStat.stdev(build)
-  var gmin = jStat.min(ground)
-  var tmin = jStat.min(terrain)
-  var bmin = jStat.min(build)
-  var bmedi = jStat.median(build)
-  var gmax = jStat.max(ground)
-  var tmax = jStat.max(terrain)
-  var bmax = jStat.max(build)
+
+  function gammot(list) {
+    return {
+      mean:jStat.mean(list),
+      min:jStat.min(list),
+      max:jStat.max(list),
+      median:jStat.median(list),
+      stdev:jStat.stdev(list),
+      meddev:jStat.meddev(list)
+    }
+  }
+
+  bstat = gammot(build)
+  gstat = gammot(ground)
+  tstat = gammot(terrain)
   //put onto page
-  console.log('building mean,stdev,min,max', bmean, bstdev, bmin, bmax)
-  console.log('ground mean,stdev,min,max', gmean, gstdev, gmin, gmax)
-  console.log('terrainmean,stdev,min,max', tmean, tstdev, tmin, tmax)
+  //console.log('building ', bstat)
+  //console.log('ground ', gstat)
+  //console.log('terrain ', tstat)
   var str2 = " "
   str2 = ' accepted height: ' + featProps.height
-  str2 += ' <br> mean height: ' + bmean
-  str2 += ' <br> max: ' + bmax
-  str2 += ' <br> min: ' + bmin
-  str2 += ' <br> stdev: ' + bstdev
-  str2 += ' <br> median: ' + bmedi
+  str2 += ' <br> mean height: ' + bstat.mean
+  str2 += ' <br> max: ' + bstat.max
+  str2 += ' <br> min: ' + bstat.min
+  str2 += ' <br> stdev: ' + bstat.stdev
+  str2 += ' <br> median: ' + bstat.median
   str2 += ' <br> count: ' + ground.length
-  return str2
+  str2 += ' <br> trn_mean - grnd_mean: ' + (tstat.mean - gstat.mean)
+  return {str:str2, buildings:bstat, ground:gstat, terrain:tstat}
 }
 
-function tooltip(x,y,val) {
-  var dv=document.getElementById('results')
-  dv.style.left = x+"px"
-  dv.style.top = y+"px"
-  dv.innerHTML = val
-}
 
 //
 var bins
@@ -148,12 +180,30 @@ drawElevation = function() {
     }
   }
 }
+
+//
+// init map
+//
+var map
+var gpopup
+function initMap() {
+  map = L.map('map1').setView([51.505, -0.09], 13);
+  var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var osmAttrib='Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+  var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 18, attribution: osmAttrib});   
+  map.setView(new L.LatLng( 37.7898253274591, -122.40611229067207 ),15);
+  map.addLayer(osm);
+  gpopup = L.popup()
+    .setLatLng([ 37.7898253274591, -122.40611229067207])
+    .setContent("hello")
+    .openOn(map)
+}
 </script>
 </head>
 <body>
 <div id="results" style="position:absolute; left:0px; top:0px; background-color:black; color:white;   border-radius: 5px;"></div>
 <div id="can"></div>
-<canvas width=800 height=600 id="can2"></canvas>
+<div id="map1" style="height:400px; width:400px"></div>
 </body>
 </html>
 

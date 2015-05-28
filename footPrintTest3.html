@@ -52,7 +52,7 @@ function loadFootPrints(url) {
       //console.log("Success!", response);
       var jsn = JSON.parse(response)
       console.log(jsn)
-      geoJsonLookup = new pointInGeojsonTester( jsn,{width:800, height:800})
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:1400, height:1400})
       geoJsonLookup.calcCentroids()
       document.getElementById('foot-can').appendChild( geoJsonLookup.canvas)
       geoJsonLookup.canvas.style.cssText = "height:300px; width:600px;"
@@ -82,7 +82,7 @@ function enqueFootPrintsSample(lookup) {
   var jsonSamples = lookup.calcCentroids()
   bins = new squareBins({minX:lookup.xMin, maxX:lookup.xMax, minY:lookup.yMin, maxY:lookup.yMax, width:18, height:18})
   for(var i in jsonSamples.allPoints) {
-    var sampCount = Math.min(60, jsonSamples.allPointsLatLon[i].length/3)
+    var sampCount = Math.min(90, jsonSamples.allPointsLatLon[i].length/3)
     sampCount = Math.max(10, sampCount)
     randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
     for(var j=0; j<randSamp.length; j++) {
