@@ -18,6 +18,8 @@
 
 var geoJsonLookup
 var g_elev
+var gBins
+var gHitGeoJson
 
 function getUrl(url) {
   return new Promise(function(resolve, reject) {
@@ -72,34 +74,14 @@ function loadFootPrints(url) {
         gpopup.setContent(d.str)
         map.setView(ll)
       }
+      //
+      // display hits
+      if( map && gpopup && feat &&feat.properties && feat.properties.hits) {
+        var gj = hits2FeatureCollection( feat.properties.hits)
+        map.removeLayer(gHitGeoJson)
+        gHitGeoJson = new L.geoJson(gj).addTo(map)
+      }
     }
-}
-
-function getBuildoingStatsCSV() {
-  var feat1 = geoJsonLookup.features[0].properties
-  var stat1 = getStats(feat1)
-  var CSV=""
-  for(var i in stat1.buildings){
-    CSV += i+","
-  }
-  CSV += "mean terrain minus mean ground \n"
-  for(var i=0; i<geoJsonLookup.features.length; i++) {
-    var feat = geoJsonLookup.features[i].properties
-    var stats = getStats(feat)
-    for(var j in stats.buildings ) {
-      var fb = stats.buildings[j] 
-      CSV+= Number(fb).toFixed(6) + ", "
-    }
-    CSV += (stats.terrain.mean-stats.ground.mean).toFixed(6) +"\n"
-  }
-  return CSV
-  //CSV = CSV.slice(0,-1)//get rid of the last comma. Horribly slow
-}
-
-function saveNuildingStats() {
-  var boo = getBuildoingStatsCSV()
-  var blob = new Blob([boo], {type: "text/plain;charset=utf-8"});
-  saveAs(blob,"buildingStats.csv")
 }
 
 function getStats( featProps) {
@@ -146,40 +128,22 @@ function getStats( featProps) {
 }
 
 
-//
-var bins
 function lookAtFootPrints(lookup) {
   var jsonSamples = lookup.calcCentroids()
-  bins = new squareBins({minX:lookup.xMin-0.001, maxX:lookup.xMax+0.001, minY:lookup.yMin-0.001, maxY:lookup.yMax+0.001, width:40, height:40})
+  gBins = new squareBins({minX:lookup.xMin-0.001, maxX:lookup.xMax+0.001, minY:lookup.yMin-0.001, maxY:lookup.yMax+0.001, width:40, height:40})
   var randSamp 
   for(var i in jsonSamples.allPoints) {
     var sampCount = Math.min(60, jsonSamples.allPointsLatLon[i].length/4)
     randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
     //console.log(randSamp)
     for(var j=0; j<randSamp.length; j++) {
-      bins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
+      gBins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
     }
   }
   console.log(randSamp)
 }
 
 loadFootPrints('./data/sanfran-hitTest-4326.json')
-
-
-drawElevation = function() {
-  var can2 = document.getElementById('can2')
-  var ctx = can2.getContext('2d')
-  for(var x = 0; x<can2.width; x+=2){
-    for(var y=0; y<can2.height; y+=2){
-        var lon=scaleValue(0, x, can2.width, geoJsonLookup.xMin, geoJsonLookup.xMax)
-        var lat=scaleValue(0, y, can2.height, geoJsonLookup.yMin, geoJsonLookup.yMax)
-        var elv = g_elev.queryLatLon(lat,lon)
-        var rgb = HSVtoRGB(0.2+elv/150, 1, 0.5)
-        ctx.fillStyle = "rgb("+rgb.r+","+rgb.g+","+rgb.b+")"
-        ctx.fillRect(x,y,2,2)
-    }
-  }
-}
 
 //
 // init map
@@ -191,14 +155,69 @@ function initMap() {
   var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var osmAttrib='Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
   var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 18, attribution: osmAttrib});   
-  map.setView(new L.LatLng( 37.7898253274591, -122.40611229067207 ),15);
+  map.setView(new L.LatLng( 37.7898253274591, -122.40611229067207 ),17);
   map.addLayer(osm);
   gpopup = L.popup()
     .setLatLng([ 37.7898253274591, -122.40611229067207])
     .setContent("hello")
     .openOn(map)
+  gHitGeoJson = L.geoJson().addTo(map)
+}
+
+//
+// CSV stuff
+//
+function getBuildoingStatsCSV() {
+  var feat1 = geoJsonLookup.features[0].properties
+  var stat1 = getStats(feat1)
+  var CSV=""
+  for(var i in stat1.buildings){
+    CSV += i+","
+  }
+  CSV += "mean terrain minus mean ground \n"
+  for(var i=0; i<geoJsonLookup.features.length; i++) {
+    var feat = geoJsonLookup.features[i].properties
+    var stats = getStats(feat)
+    for(var j in stats.buildings ) {
+      var fb = stats.buildings[j] 
+      CSV+= Number(fb).toFixed(6) + ", "
+    }
+    CSV += (stats.terrain.mean-stats.ground.mean).toFixed(6) +"\n"
+  }
+  return CSV
+  //CSV = CSV.slice(0,-1)//get rid of the last comma. Horribly slow
+}
+
+function saveBuildingStats() {
+  var boo = getBuildoingStatsCSV()
+  var blob = new Blob([boo], {type: "text/plain;charset=utf-8"});
+  saveAs(blob,"buildingStats.csv")
+}
+
+//
+// generate TIN
+//
+function generateTin( hits) {
+  //var point1 = turf.point(0,0);
+
+}
+function hits2FeatureCollection( hits) {
+  var fc = []
+  for(var i=0; i<hits.length; i++) {
+    var p = turf.point([hits[i].x, hits[i].y], hits[i])
+    fc.push(p)
+  }
+  var featColl = turf.featurecollection(fc)
+  return featColl
 }
 </script>
+<style>
+.leaflet-popup-content-wrapper {
+  background-color: rgba(255,255,255,0.3);
+  text-shadow: 0 0 4px yellow
+}
+
+</style>
 </head>
 <body>
 <div id="results" style="position:absolute; left:0px; top:0px; background-color:black; color:white;   border-radius: 5px;"></div>
