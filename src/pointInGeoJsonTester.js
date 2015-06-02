@@ -66,10 +66,16 @@ var pointInGeojsonTester = function(jsonObject, options) {
       var coords = features[i].geometry.coordinates;
       var geomtype = features[i].geometry.type;
       if (geomtype == "Polygon") {
-        traverseCoordinates(coords[0], type);
+        traverseCoordinates(coords[0], type,n);
+        for( var j=1; j < coords.length; j++) {
+          traverseCoordinates(coords[j], 'hole',n)
+        }
       } else if (geomtype == "MultiPolygon") {
         for (var k = 0; k < coords.length; k++) {
           traverseCoordinates(coords[k][0], type, n);
+          for( var j=1; j < coords[k].length; j++) {
+            traverseCoordinates(coords[k][j], 'hole', n)
+          }
         }
       }
       //console.log(n);
@@ -158,6 +164,11 @@ var pointInGeojsonTester = function(jsonObject, options) {
     var b = rgb[2]
     ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')'
     ctx.lineWidth = 0;
+    if( type == 'hole') {
+      ctx.save()
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.beginPath()
+    }
     if (type == 'bounds') {
       for (var j = 0; j < coordinates.length; j++) {
         var x = coordinates[j][0];
@@ -168,7 +179,7 @@ var pointInGeojsonTester = function(jsonObject, options) {
         this2.yMax = Math.max(this2.yMax, y)
       }
     }
-    if (type == 'draw') {
+    if (type == 'draw' || type == 'hole') {
       for (var j = 0; j < coordinates.length; j++) {
         var lon = coordinates[j][0];
         var lat = coordinates[j][1];
@@ -184,6 +195,9 @@ var pointInGeojsonTester = function(jsonObject, options) {
       }
     }
     ctx.fill();
+    if( type == 'hole') {
+      ctx.restore()
+    }
   }
 
   this.calcCentroids = function() {

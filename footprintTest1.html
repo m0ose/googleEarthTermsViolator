@@ -8,9 +8,9 @@
 <script src="./src/miscUtils.js"></script>
 <script src="./bower_components/FileSaver/FileSaver.js"></script>
 <script src="./bower_components/turf/turf.js"></script>
- <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
- <script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
-
+<link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
+<script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
+<script src="./bower_components/delaunay-fast/delaunay.js"></script>
 <!--<script>exports = {}//required for the hilbert curve library</script>
 <script src="./bower_components/hilbert-js/hilbert2d.js"></script>
 -->
@@ -46,42 +46,15 @@ function loadFootPrints(url) {
       //console.log("Success!", response);
       var jsn = JSON.parse(response)
       console.log(jsn)
-      geoJsonLookup = new pointInGeojsonTester( jsn,{width:400, height:400})
+      geoJsonLookup = new pointInGeojsonTester( jsn,{width:1600, height:1600})
       document.getElementById('can').appendChild( geoJsonLookup.canvas)
       geoJsonLookup.canvas.id = "geojson-canvas"
+      geoJsonLookup.canvas.style.cssText="width:400px;height:400px;"
       geoJsonLookup.centroids2properties()
-      geoJsonLookup.canvas.onmousemove = mousemover
       initMap()
     }).catch(function(error) {
       console.error("Failed", error);
     })
-
-    var mousemover =  function(e){
-      //console.log(e)
-      var bb = this.getBoundingClientRect()
-      //console.log(bb)
-      var x = e.clientX - bb.left
-      var y = e.clientY - bb.top
-      var feat = geoJsonLookup.featureOfCanXY(x,y)
-      var indx = geoJsonLookup.indexOfCanvasXY(x,y)
-      var dv=document.getElementById('results')
-      // move map
-      //
-      if( map && gpopup && feat) {
-        var d = getStats( feat.properties)
-        var ll = new L.LatLng(feat.properties.clat, feat.properties.clon)
-        gpopup.setLatLng(ll)
-        gpopup.setContent(d.str)
-        map.setView(ll)
-      }
-      //
-      // display hits
-      if( map && gpopup && feat &&feat.properties && feat.properties.hits) {
-        var gj = hits2FeatureCollection( feat.properties.hits)
-        map.removeLayer(gHitGeoJson)
-        gHitGeoJson = new L.geoJson(gj).addTo(map)
-      }
-    }
 }
 
 function getStats( featProps) {
@@ -154,7 +127,7 @@ function initMap() {
   map = L.map('map1').setView([51.505, -0.09], 13);
   var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var osmAttrib='Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
-  var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 18, attribution: osmAttrib});   
+  var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 22, attribution: osmAttrib});   
   map.setView(new L.LatLng( 37.7898253274591, -122.40611229067207 ),17);
   map.addLayer(osm);
   gpopup = L.popup()
@@ -162,6 +135,45 @@ function initMap() {
     .setContent("hello")
     .openOn(map)
   gHitGeoJson = L.geoJson().addTo(map)
+
+  map.on('click', function(e) {   
+    var loca= e.latlng;
+    var feat = geoJsonLookup.featureOf(loca.lat, loca.lng)
+    console.log('click',loca,feat)     
+    // move popup
+    //
+    // display hits
+    if( map && gpopup && feat &&feat.properties && feat.properties.hits) {
+      var showthis = getFormChecked()
+      var gj = feat
+      if( showthis == 'tin'){
+        gj = makeTin(feat)
+      } else if( showthis == 'hits') {
+        gj = generateAllPoints(feat) 
+      }else if( showthis == 'tin_delaunay') {
+        gj = makeTinDelaunay(feat) 
+      }
+      map.removeLayer(gHitGeoJson)
+      gHitGeoJson = new L.geoJson(gj).addTo(map)
+    }
+  });
+
+    if( map && gpopup && feat) {
+    var d = getStats( feat.properties)
+      var ll = new L.LatLng(feat.properties.clat, feat.properties.clon)
+      gpopup.setLatLng(ll)
+      gpopup.setContent(d.str)
+    }
+}
+
+function getFormChecked() {
+  var radios = document.getElementsByName('polytype');
+  for (var i = 0, length = radios.length; i < length; i++) {
+      if (radios[i].checked) {
+         return radios[i].value
+          break;
+      }
+  }
 }
 
 //
@@ -185,7 +197,6 @@ function getBuildoingStatsCSV() {
     CSV += (stats.terrain.mean-stats.ground.mean).toFixed(6) +"\n"
   }
   return CSV
-  //CSV = CSV.slice(0,-1)//get rid of the last comma. Horribly slow
 }
 
 function saveBuildingStats() {
@@ -197,14 +208,105 @@ function saveBuildingStats() {
 //
 // generate TIN
 //
-function generateTin( hits) {
-  //var point1 = turf.point(0,0);
+function makeTin( feature) {
+  var fc = generateAllPoints( feature)
+  // scale values as to not get tangled mesh. 
+  fc.features.forEach(function(a){ 
+    var c = a.geometry.coordinates
+    c[0] = c[0] * 100000
+    c[1] = c[1] * 100000
+  })
+  //make tin
+  var tinn = turf.tin(fc,'sucky')
+  //un scale values
+  tinn.features.forEach(function(a){ 
+    var c = a.geometry.coordinates[0]
+    for(var i=0; i < c.length; i++) {
+      c[i][0] = c[i][0] / 100000
+      c[i][1] = c[i][1] / 100000
+    }
+  })
+  return tinn
+}
 
+function makeTinDelaunay( feature){
+  var mult = 100000
+  var feat2 = generateAllPoints( feature)
+  var a=[]
+  feat2.features.forEach(function(b){ 
+    a.push([b.geometry.coordinates[0]*mult,b.geometry.coordinates[1]*mult]) 
+  })
+  //var c = filterOutCoincidentPoints( a)
+  //console.log(c)
+  //a = _.sample(a,10)
+  var vertices = Delaunay.triangulate(a)
+  // turn vertices into feature collection
+  var polys = []
+  for(var i=0; i < a.length; i+=1){ 
+    a[i][0] = a[i][0]/mult
+    a[i][1] = a[i][1]/mult
+  }
+  for(var i=0; i < vertices.length; i+=3){ 
+    var p = [ a[ vertices[i] ], a[ vertices[i+1] ], a[ vertices[i+2] ], a[ vertices[i] ] ]
+    polys.push(p)
+  }
+  var polygon = turf.polygon(polys)
+  return polygon
+}
+/*
+//uses other delaunay library. still all tangled
+function makeTinDelaunay( feature){
+  var feat2 = generateAllPoints( feature)
+  var a=[]
+  feat2.features.forEach(function(b){ 
+    var dp = new delaunay.Vertex(b.geometry.coordinates[0],b.geometry.coordinates[1])
+    a.push(dp) 
+  })
+  //var c = filterOutCoincidentPoints( a)
+  //console.log(c)
+  var vertices = delaunay.triangulate(a)
+  // turn vertices into feature collection
+  var polys = []
+  for(var i=0; i < vertices.length; i+=1){ 
+    var v = vertices[i]
+    var p = [ [v.v0.x, v.v0.y], [v.v1.x, v.v1.y], [v.v2.x, v.v2.y], [v.v0.x, v.v0.y] ]
+    polys.push(p)
+  }
+  var polygon = turf.polygon(polys)
+  return polygon
+}*/
+function filterOutCoincidentPoints(items, key) {
+    key = key || [].join
+    var set = {}
+    return items.filter(function(item) {
+        var k = key ? key.apply(item) : item
+        return k in set ? false : set[k] = true
+    })
+}
+
+
+function generateAllPoints( feature) {
+  var fc = hits2FeatureCollection( feature.properties.hits)
+  //get border points
+  var coords = feature.geometry.coordinates;
+  var geomtype = feature.geometry.type;
+  var windingNumber = 0
+  if (geomtype == "Polygon") {
+    for( var j=0; j < coords.length; j++) {
+      for( var k=0; k<coords[j].length; k++){
+        var coor = coords[j][k]
+        var p = turf.point(coor, {sucky:{border:true, winding:windingNumber, x:coor[0], y:coor[1]}})
+        fc.features.push(p)
+        windingNumber++
+      }
+    }
+  } 
+  return fc
 }
 function hits2FeatureCollection( hits) {
   var fc = []
   for(var i=0; i<hits.length; i++) {
-    var p = turf.point([hits[i].x, hits[i].y], hits[i])
+    var p = turf.point([hits[i].x, hits[i].y], {sucky:hits[i]})
     fc.push(p)
   }
   var featColl = turf.featurecollection(fc)
@@ -217,12 +319,33 @@ function hits2FeatureCollection( hits) {
   text-shadow: 0 0 4px yellow
 }
 
+.leftpane {
+  float:left;
+}
+
+
+
 </style>
 </head>
 <body>
-<div id="results" style="position:absolute; left:0px; top:0px; background-color:black; color:white;   border-radius: 5px;"></div>
-<div id="can"></div>
-<div id="map1" style="height:400px; width:400px"></div>
+<div class="leftpane">
+  <div id="map1" style="height:600px; width:600px"></div>
+  <div id="can"></div>
+</div>
+<div class="rightpane">
+  <form id="whatShowed">
+    Show what when clicked?
+    <br>
+    <input type="radio" name="polytype" value="outer_polygon" checked>outer_polygon
+    <br>
+    <input type="radio" name="polytype" value="tin">tin
+    <br>
+    <input type="radio" name="polytype" value="tin_delaunay">tin_delaunay
+    <br>
+    <input type="radio" name="polytype" value="hits">hits
+  </form>
+  <hr>
+</div>
 </body>
 </html>
 
