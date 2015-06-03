@@ -60,6 +60,7 @@ OSMtools = function(){
 
   this.elemList2xml = function( elemList) {
     // xml is tough to deal with
+    //  an xml node can only exist in one tree, so I just turn it into a string then re-parse
     var header = "<osm version='0.6' generator='Overpass API'>"+
                 "<note>The data included in this document is from www.openstreetmap.org. The data is made available under ODbL.</note>"+
                 "<meta osm_base='2015-06-03T21:00:02Z'/>" 
