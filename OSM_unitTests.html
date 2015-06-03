@@ -1,0 +1,65 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>unit test of OSMtools</title>
+  <link rel="stylesheet" href="//code.jquery.com/qunit/qunit-1.18.0.css">
+  <script src="//code.jquery.com/qunit/qunit-1.18.0.js"></script>
+  <script src="src/OSMtools.js"></script>
+  <script src="bower_components/osmtogeojson/osmtogeojson.js"></script>
+  <script>
+    
+    var osm0, osm1
+    function basicTests() {
+
+      QUnit.test( "create Loader", function( assert ) {
+        osm0 = new OSMtools()
+        assert.ok( osm0 != null, "Passed!" )
+      });
+
+      QUnit.test( "async load of osm", function( assert ) {
+        osm1 = new OSMtools()
+        var done1 = assert.async()
+        osm1.loadOSM({ul:{y:35.68862, x:-105.94344}, lr:{y:35.68543, x:-105.93986} },
+          function(err,v){
+            if(v){
+              // the osm was loaded
+              assert.ok( v != null, "loading Passed!" )
+              var a = osm1.parsedData.getElementsByTagName('osm')
+              // the osm was parsed
+              if( a.length>0){
+                assert.ok( v != null, "parsing Passed!" )
+              } else {
+                assert.notOk( v, "parse failed" );
+              }
+              var wayLength = osm1.parsedData.getElementsByTagName('way').length
+              // test the filter function
+              var buildings1 = filterBuildings()
+              assert.ok(buildings1.getElementsByTagName('way').length>10, "filter worked...I think")
+              // test the filter function
+              var buildings2 = filterBuildings()
+              assert.ok(buildings2.getElementsByTagName('way').length>10, "filter worked. a second time")
+              assert.equal(wayLength,osm1.parsedData.getElementsByTagName('way').length, "Didn't lose data")
+              // convert to osm
+              var buildingsJson = osmtogeojson(buildings2)
+              assert.ok(buildingsJson, "geojson worked")
+            } else {
+              assert.notOk( err, "load failed" );
+            }
+            done1()
+          }
+        )
+      })
+    }
+
+    function filterBuildings(){
+      return osm1.filterJustBuildings()
+    }
+
+    basicTests() 
+  </script>
+</head>
+<body>
+  <div id="qunit"></div>
+  <div id="qunit-fixture"></div>
+</body>
+</html>
