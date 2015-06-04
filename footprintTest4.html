@@ -1,0 +1,331 @@
+<html>
+<head>
+<script src="./src/pointInGeoJsonTester.js"></script>
+<script src="./bower_components/jstat/dist/jstat.js"></script>
+<script src="./bower_components/squareBins/squareBins.js"></script>
+<script src="http://underscorejs.org/underscore-min.js"></script>
+<script src="src/getElevationFromServer.js"></script>
+<script src="./src/miscUtils.js"></script>
+<script src="./bower_components/FileSaver/FileSaver.js"></script>
+<script src="./bower_components/turf/turf.js"></script>
+<link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
+<script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
+<script src="bower_components/poly2tri/dist/poly2tri.js"></script>
+<script src="./bower_components/delaunay-fast/delaunay.js"></script>
+<script src="src/TINNER.js"></script>
+
+<!--<script>exports = {}//required for the hilbert curve library</script>
+<script src="./bower_components/hilbert-js/hilbert2d.js"></script>
+-->
+<script>
+
+var geoJsonLookup
+var g_elev
+var gBins
+var gHitGeoJson
+
+function loadFootPrints(url) {
+    getUrl(url).then(function(response) {
+      //console.log("Success!", response);
+      var jsn = JSON.parse(response)
+      jsonLoaded(jsn)
+      initMap()
+      setupFileUpload()
+      moveMapToBounds()
+    }).catch(function(error) {
+      console.error("Failed", error);
+    })
+}
+
+function jsonLoaded(jsn) {
+  geoJsonLookup = new pointInGeojsonTester( jsn,{width:1400, height:1400})
+  var footCan = document.getElementById('can')
+  footCan.innerHTML = " "
+  footCan.appendChild( geoJsonLookup.canvas)
+  geoJsonLookup.canvas.id = "geojson-canvas"
+  geoJsonLookup.canvas.style.cssText="width:400px;height:400px;"
+  geoJsonLookup.centroids2properties()
+}
+
+function getStats( featProps) {
+  var ground = []
+  var terrain = []
+  var build = []
+  if( featProps.hits) {
+    for(var i=0; i < featProps.hits.length; i++) {
+      var hit = featProps.hits[i]
+      ground.push(hit.g)
+      terrain.push(hit.a)
+      build.push(hit.a-hit.g)
+    }
+  }
+
+  function gammot(list) {
+    return {
+      mean:jStat.mean(list),
+      min:jStat.min(list),
+      max:jStat.max(list),
+      median:jStat.median(list),
+      stdev:jStat.stdev(list),
+      meddev:jStat.meddev(list)
+    }
+  }
+
+  bstat = gammot(build)
+  gstat = gammot(ground)
+  tstat = gammot(terrain)
+  //put onto page
+  //console.log('building ', bstat)
+  //console.log('ground ', gstat)
+  //console.log('terrain ', tstat)
+  var str2 = " "
+  str2 = ' accepted height: ' + featProps.height
+  str2 += ' <br> mean height: ' + bstat.mean
+  str2 += ' <br> max: ' + bstat.max
+  str2 += ' <br> min: ' + bstat.min
+  str2 += ' <br> stdev: ' + bstat.stdev
+  str2 += ' <br> median: ' + bstat.median
+  str2 += ' <br> count: ' + ground.length
+  str2 += ' <br> trn_mean - grnd_mean: ' + (tstat.mean - gstat.mean)
+  return {str:str2, buildings:bstat, ground:gstat, terrain:tstat}
+}
+
+
+function lookAtFootPrints(lookup) {
+  var jsonSamples = lookup.calcCentroids()
+  gBins = new squareBins({minX:lookup.xMin-0.001, maxX:lookup.xMax+0.001, minY:lookup.yMin-0.001, maxY:lookup.yMax+0.001, width:40, height:40})
+  var randSamp 
+  for(var i in jsonSamples.allPoints) {
+    var sampCount = Math.min(60, jsonSamples.allPointsLatLon[i].length/4)
+    randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
+    //console.log(randSamp)
+    for(var j=0; j<randSamp.length; j++) {
+      gBins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
+    }
+  }
+  console.log(randSamp)
+}
+
+//loadFootPrints('./data/ny-hitTest.json')
+loadFootPrints('./data/sanfran-hitTest-4326.json')
+
+//
+// init map
+//
+var map
+var gpopup
+function initMap() {
+  map = L.map('map1').setView([51.505, -0.09], 13);
+  var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var osmAttrib='Map data © <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+  var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 22, attribution: osmAttrib});   
+  map.setView(new L.LatLng( 37.7898253274591, -122.40611229067207 ),17);
+  map.addLayer(osm);
+  gpopup = L.popup()
+    .setLatLng([ 37.7898253274591, -122.40611229067207])
+    .setContent("hello")
+    .openOn(map)
+  gHitGeoJson = L.geoJson().addTo(map)
+
+  map.on('click', function(e) {   
+    var loca= e.latlng;
+    var feat = geoJsonLookup.featureOf(loca.lat, loca.lng)
+    console.log('click',loca,feat)     
+    // move popup
+    //
+    // display hits
+    if( map && gpopup && feat &&feat.properties && feat.properties.hits) {
+      var showthis = getFormChecked()
+      var gj = feat
+      if( showthis == 'tin'){
+        gj = makeTin(feat)
+      } else if( showthis == 'hits') {
+        gj = generateAllPoints(feat) 
+      }else if( showthis == 'tin_delaunay') {
+        gj = makeTinDelaunay(feat) 
+      }
+      map.removeLayer(gHitGeoJson)
+      var style = {  
+        "color": "#4444ff",
+        "weight": 2,
+        "opacity": 0.65
+      }
+      gHitGeoJson = new L.geoJson(gj, {style:style} ).addTo(map)  
+      if( map && gpopup && feat) {
+        var d = getStats( feat.properties)
+        var ll = new L.LatLng(feat.properties.clat, feat.properties.clon)
+        gpopup.setLatLng(ll)
+        gpopup.setContent(d.str)
+      }
+    }
+  });
+}
+
+function moveMapToBounds() {
+  var x = (geoJsonLookup.xMax + geoJsonLookup.xMin)/2
+  var y = (geoJsonLookup.yMax + geoJsonLookup.yMin)/2
+  map.setView(new L.LatLng( y, x ),17);
+}
+
+function getFormChecked() {
+  var radios = document.getElementsByName('polytype');
+  for (var i = 0, length = radios.length; i < length; i++) {
+      if (radios[i].checked) {
+         return radios[i].value
+          break;
+      }
+  }
+}
+
+//
+// CSV stuff
+//
+function getBuildoingStatsCSV() {
+  var feat1 = geoJsonLookup.features[0].properties
+  var stat1 = getStats(feat1)
+  var CSV=""
+  for(var i in stat1.buildings){
+    CSV += i+","
+  }
+  CSV += "mean terrain minus mean ground \n"
+  for(var i=0; i<geoJsonLookup.features.length; i++) {
+    var feat = geoJsonLookup.features[i].properties
+    var stats = getStats(feat)
+    for(var j in stats.buildings ) {
+      var fb = stats.buildings[j] 
+      CSV+= Number(fb).toFixed(6) + ", "
+    }
+    CSV += (stats.terrain.mean-stats.ground.mean).toFixed(6) +"\n"
+  }
+  return CSV
+}
+
+function saveBuildingStats() {
+  var boo = getBuildoingStatsCSV()
+  var blob = new Blob([boo], {type: "text/plain;charset=utf-8"});
+  saveAs(blob,"buildingStats.csv")
+}
+
+
+function makeTin( feature){
+  return TINNER.makeTin( feature)
+}
+
+function generateAllPoints( feature) {
+  var fc = hits2FeatureCollection( feature.properties.hits)
+  //get border points
+  var coords = feature.geometry.coordinates;
+  var geomtype = feature.geometry.type;
+  var windingNumber = 0
+  if (geomtype == "Polygon") {
+    for( var j=0; j < coords.length; j++) {
+      for( var k=0; k<coords[j].length; k++){
+        var coor = coords[j][k]
+        var p = turf.point(coor, {sucky:{border:true, winding:windingNumber, x:coor[0], y:coor[1]}})
+        fc.features.push(p)
+        windingNumber++
+      }
+    }
+  } 
+  return fc
+}
+
+function hits2FeatureCollection( hits) {
+  var fc = []
+  for(var i=0; i<hits.length; i++) {
+    var p = turf.point([hits[i].x, hits[i].y], {sucky:hits[i]})
+    fc.push(p)
+  }
+  var featColl = turf.featurecollection(fc)
+  return featColl
+}
+
+//
+// file selector stuff
+//
+  // Setup the dnd listeners.
+function setupFileUpload(){
+  var dropZone = document.getElementById('drop_zone');
+  dropZone.addEventListener('dragover', handleDragOver, false);
+  dropZone.addEventListener('drop', handleFileSelect, false);
+  document.getElementById('files').addEventListener('change', handleFileSelect, false);
+}
+
+function handleFileSelect(evt) {
+  evt.stopPropagation();
+  evt.preventDefault();
+  var files = evt.target.files || evt.dataTransfer.files; // FileList object.
+  var file = files[0] //only one file at a time
+  var reader = new FileReader();
+  reader.onload = function(fl) {
+    console.log(fl)
+    if( fl.target.readyState == 2) {
+      var gj = JSON.parse(fl.target.result)
+      jsonLoaded(gj)
+      moveMapToBounds()
+    }
+  }
+  reader.readAsText(file)
+}
+
+function handleDragOver(evt) {
+  evt.stopPropagation();
+  evt.preventDefault();
+  evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+}
+</script>
+
+
+<style>
+.leaflet-popup-content-wrapper {
+  background-color: rgba(255,255,255,0.3);
+  text-shadow: 0 0 4px yellow
+}
+
+.leftpane {
+  float:left;
+}
+
+#drop_zone {
+  border-style: dashed;
+  border-width: medium;
+  border-radius: 10px;
+}
+
+
+</style>
+</head>
+<body>
+<div class="leftpane">
+  <div id="map1" style="height:600px; width:600px"></div>
+  <div id="can"></div>
+</div>
+<div class="rightpane">
+  <form id="whatShowed">
+    Show what when clicked?
+    <br>
+    <input type="radio" name="polytype" value="outer_polygon" checked>outer_polygon
+    <br>
+    <input type="radio" name="polytype" value="tin">tin_delauny_costrained
+    <br>
+    <input type="radio" name="polytype" value="hits">hits
+  </form>
+  <hr>
+  <div id="drop_zone">
+    Drop<br> files<br> here
+    <br>
+    <br>
+    <output id="list"></output>
+  </div>
+  <br>
+  <input type="file" id="files" name="files[]" />
+</div>
+</body>
+</html>
+
+
+
+
+
+
+

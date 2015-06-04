@@ -1,0 +1,217 @@
+<html>
+<head>
+<script src="./src/pointInGeoJsonTester.js"></script>
+<script src="./bower_components/jstat/dist/jstat.js"></script>
+<script src="./bower_components/squareBins/squareBins.js"></script>
+<script src="http://underscorejs.org/underscore-min.js"></script>
+<script src="src/getElevationFromServer.js"></script>
+<script src="./bower_components/FileSaver/FileSaver.js"></script>
+
+<script src="https://www.google.com/jsapi?key=ABQIAAAADyG-Is-nbf-mhbZu3jEfJhT2yXp_ZAY8_ufC3CFXhHIE1NvwkxTIxKYNH__thZKWla5gV347ZcL5VA"></script>
+<script src="./src/initEarth.js"></script>
+<script src="./src/utilsEarth.js"></script>
+<script src="./src/miscUtils.js"></script>
+<script src="src/OSMtools.js"></script>
+<script src="bower_components/osmtogeojson/osmtogeojson.js"></script>
+<title>Altitude Scan</title>
+
+<script>
+
+var geoJsonLookup
+var continueScan = true
+var gAltitude = 800
+var g_elev
+g_finalHeights = []
+g_drawThese = []
+var myqueue
+
+ function stopScan() {
+      continueScan = false
+  }
+
+function loadFootPrints(url) {
+    getUrl(url).then(function(response) {
+      //console.log("Success!", response);
+      var jsn = JSON.parse(response)
+      console.log(jsn)
+      jsonLoaded(jsn)
+    }).catch(function(error) {
+      console.error("Failed", error);
+    });
+}
+
+function jsonLoaded(jsn) {
+  geoJsonLookup = new pointInGeojsonTester( jsn,{width:1400, height:1400})
+  geoJsonLookup.calcCentroids()
+  var footCan = document.getElementById('foot-can')
+  footCan.innerHTML = " "
+  footCan.appendChild( geoJsonLookup.canvas)
+  geoJsonLookup.canvas.style.cssText = "height:300px; width:600px;"
+  loadElevation( geoJsonLookup.yMax, geoJsonLookup.yMin, geoJsonLookup.xMax, geoJsonLookup.xMin)
+}
+
+function loadElevation(north, south, east, west) {
+  g_elev = new elevationFromServer({north:north, south:south, east:east, west:west}, function(e){
+    if(e){
+      console.warn(e)
+    }else{
+      console.log('success loading elevation from NED10m')
+    }
+  })
+}
+
+///
+//
+//  Google earth stuff
+//
+function enqueFootPrintsSample(lookup) {
+  var queue = []
+  var bins
+  var jsonSamples = lookup.calcCentroids()
+  bins = new squareBins({minX:lookup.xMin, maxX:lookup.xMax, minY:lookup.yMin, maxY:lookup.yMax, width:18, height:18})
+  for(var i in jsonSamples.allPoints) {
+    var sampCount = Math.min(90, jsonSamples.allPointsLatLon[i].length/3)
+    sampCount = Math.max(10, sampCount)
+    randSamp = _.sample(jsonSamples.allPointsLatLon[i], sampCount)
+    for(var j=0; j<randSamp.length; j++) {
+      bins.addPoint(randSamp[j][1], randSamp[j][0], {lookupIndex:i} )
+    }
+  }
+  var count = 0
+  bins.forEachBin_zigzag( function(p, binx, biny){
+    var cxy = bins.binxy2xy(binx+0.5, biny+0.5)
+    queue.push({move:cxy})
+    p.forEach( function(v){
+      queue.push(v)
+    })
+    count++
+  })
+  return queue
+}
+
+function runSequence() {
+  myqueue = enqueFootPrintsSample( geoJsonLookup)
+  ge.getOptions().setFlyToSpeed(6)
+  processNext()
+  continueScan = true
+}
+
+function processNext() {
+  var move
+  var batch = []
+  var dims = earthUtils.getEarthDimensions()
+  for(var i=0; i<200 && myqueue.length>0; i++) {
+    a = myqueue.shift()
+    if( a.move) {
+      move = a
+      break;
+    } else {
+      //convert lat lon to google earth plugin screen coords
+      var sx = scaleValue(dims.ul.x, a.x, dims.lr.x,0,dims.div.width)
+      var sy = scaleValue(dims.lr.y, a.y, dims.ul.y,dims.div.height,0)
+      a.NED10m = g_elev.queryLatLon(a.y,a.x)
+      batch.push([sx,sy,a])
+    }
+  }
+  if(batch.length>0) {
+    var sample = earthUtils.listShot(batch)
+    g_finalHeights = g_finalHeights.concat(sample)
+    g_drawThese = g_drawThese.concat(sample)
+  }
+  if( !continueScan){
+    //do nothing
+  } else if(move) {
+    earthUtils.gotoLatLon(move.move[1], move.move[0], gAltitude)
+    //moveBaloon(move.move[1], move.move[0])
+    drawHeights(g_drawThese)
+    setTimeout(processNext, 500)
+  }else{
+    setTimeout(processNext, 100)
+  }
+  if( myqueue.length <= 0) {
+    drawHeights(g_drawThese)
+    processDone()
+  }
+}
+
+function processDone() {
+  console.log('done')
+  continueScan = false
+  g_finalHeights.forEach( function(v){
+    var lkp = geoJsonLookup.features[v.data.val.lookupIndex]
+    if(lkp){
+      if(!lkp.properties.hits){
+        lkp.properties.hits = []
+      }
+      lkp.properties.hits.push( {
+        x:v.data.x,
+        y:v.data.y,
+        a:Number(v.shot.terrain.a.toFixed(2)),
+        g:Number(v.data.NED10m.toFixed(2))//v.data.NED10m
+      })
+    }
+  })
+
+  var json = geoJsonLookup.toGeoJSON()
+  var blob = new Blob([JSON.stringify(json)], {type: "text/plain;charset=utf-8"});
+  saveAs(blob,"hitTest.json")
+}
+
+function drawHeights( drawThese){
+  var can = document.getElementById('foot-can').getElementsByTagName('canvas')[0]
+  var ctx = can.getContext('2d')
+  var wid = can.width
+  var hei = can.height
+  while(drawThese.length > 0){
+    var sam = drawThese.pop()
+    var alt = NaN
+    if( sam.shot.globe){ alt = sam.shot.globe}
+    if( sam.shot.terrain){ alt = sam.shot.terrain}
+    if( sam.shot.buildings){ alt = sam.shot.buildings}
+    if( alt){
+      var x=scaleValue(geoJsonLookup.xMin, sam.data.x, geoJsonLookup.xMax, 0, wid)
+      var y=scaleValue(geoJsonLookup.yMin, sam.data.y, geoJsonLookup.yMax, hei,0)
+      var alta = alt.a-sam.data.NED10m
+      var rgb = HSVtoRGB(Math.pow(Math.min(1.1,0.44+alta/350),2), 1, 1)
+      ctx.fillStyle = "rgb("+Math.floor(rgb.r)+","+Math.floor(rgb.g)+","+Math.floor(rgb.b) +")"
+      ctx.fillRect(x-1.5,y-1.5,3,3)
+    }
+  }
+}
+
+function loadFootPrintsForHere() {
+  var dims = earthUtils.getEarthDimensions()
+  var osm1 = new OSMtools()
+  osm1.loadOSM({ul:dims.ul, lr:dims.lr }, function(err, v) {
+    if(err){
+      console.error(err)
+      return
+    }
+    console.log('loaded footprints')
+    var bds = osm1.filterJustBuildings()
+    var jsn = osmtogeojson(bds)
+    jsonLoaded(jsn)
+  })
+}
+</script>
+</head>
+<body onload="loadFootPrints('./data/sanfran-bldgout-4326.min.json')">
+<button onclick="earthUtils.gotoSanFran()">fly to san fransisco</button>
+<button onclick="runSequence()">start scan</button>
+<button onclick="stopScan()">cancel scan</button>
+<div id="beta">
+  beta
+  <button onclick="loadFootPrintsForHere()">Load footprints for here</button>
+</div>
+<div id="map3d" style="height: 200px; width: 400px;"></div>
+<div id="results"></div>
+<div id='foot-can'></div>
+</body>
+</html>
+
+
+
+
+
+
+

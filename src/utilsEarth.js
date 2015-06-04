@@ -63,16 +63,19 @@ earthUtils = new function() {
     this.listShot = listShot
 
     function gotoLatLon(lat, lon, alt){
-        var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
+        var camera = ge.getView().copyAsCamera(ge.ALTITUDE_RELATIVE_TO_GROUND );
         camera.setAltitude(alt || 800);
         camera.setLatitude(lat);
         camera.setLongitude(lon); 
+        camera.setTilt(0)
+        camera.setRoll(0)
+        camera.setHeading(0)
         ge.getView().setAbstractView(camera);
     }
     this.gotoLatLon = gotoLatLon
 
     function gotoSanFran(){
-        var camera = ge.getView().copyAsCamera(ge.ALTITUDE_ABSOLUTE );
+        var camera = ge.getView().copyAsCamera(ge.ALTITUDE_RELATIVE_TO_GROUND );
         camera.setAltitude(1200);
         camera.setLatitude(37.79);
         camera.setLongitude(-122.396); 

@@ -98,5 +98,25 @@ var _RGB2DeciMeters = function(r,g,b){
     return n;
 }
 
+function getUrl(url) {
+  return new Promise(function(resolve, reject) {
+    var req = new XMLHttpRequest();
+    req.open('GET', url);
+    req.onload = function() {
+      if (req.status == 200) {
+        // Resolve the promise with the response text
+        resolve(req.response);
+      }
+      else {
+        reject(Error(req.statusText));
+      }
+    };
+    req.onerror = function() {
+      reject(Error("Network Error"));
+    };
+    req.send();
+  });
+}
+
 
 
