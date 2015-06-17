@@ -7,21 +7,22 @@ var TINNER = new function(){
     var extctx = gatherPoints(feature)
     extctx.triangulate();
   }catch(e){
+    throw(e)
     console.error(e)
   }
-  var triangles = extctx.getTriangles();
+  var triangles = extctx.getTriangles()
+  //estimatePerimeterElevation(triangles)
+  //get ready for geojson
   var polys = []
   for(var i=0; i < triangles.length; i++){
     var tri = triangles[i].getPoints()
-    var p = [
-      [unNormalize(tri[0].x), unNormalize(tri[0].y)], 
-      [unNormalize(tri[1].x), unNormalize(tri[1].y)], 
-      [unNormalize(tri[2].x), unNormalize(tri[2].y)],
-      [unNormalize(tri[0].x), unNormalize(tri[0].y)]
-    ]
+    var p1 = [unNormalize(tri[0].x), unNormalize(tri[0].y), tri[0].a, tri[0].g]
+    var p2 = [unNormalize(tri[1].x), unNormalize(tri[1].y), tri[1].a, tri[1].g]
+    var p3 = [unNormalize(tri[2].x), unNormalize(tri[2].y), tri[2].a, tri[2].g]
+    var p = [p1, p2, p3, p1]
     polys.push(p)
   }
-  //console.log(polys)
+  //convert polygon into geojson
   var polygon = turf.polygon(polys)
   return polygon
   }
@@ -70,11 +71,63 @@ var TINNER = new function(){
     if( hits) {
       console.log('steiner',feature.properties.hits)
       for(var i=0; i < hits.length; i++) {
-        extctx.addPoint(new poly2tri.Point( normalize(hits[i].x), normalize(hits[i].y) ) )
+        var p = new poly2tri.Point( normalize(hits[i].x), normalize(hits[i].y) ) 
+        p.a = hits[i].a
+        p.g = hits[i].g
+        extctx.addPoint(p)
         //exterior.push(new poly2tri.Point(hits[i].x*normalizer, hits[i].y*normalizer))
       }
     }
     return extctx
+  }
+
+  function estimatePerimeterElevation(triangles) {
+    var noAltCount = 0
+    var altCount = 0
+    for(var i=0; i<triangles.length; i++) {
+      var t = triangles[i]
+      for(var i2=0; i2<t.points_.length; i2++) {
+        var pnt1 = t.points_[i2]
+        if( pnt1 && !pnt1.a) {
+          var minDist = Number.MAX_SAFE_INTEGER
+          var minNode = undefined
+          var pntlist = []
+          //check points in this triangle
+          for(var n=0; n<t.points_.length; n++) {
+            var pt2 =  t.points_[n]
+            if(pt2.a > 0) 
+            pntlist.push(pt2)
+          }
+          //check points in other triangles
+          for(var n=0; n<t.neighbors_.length; n++) {
+            var nei = t.neighbors_[i]
+            for(var j=0; nei && j < nei.points_.length; j++) {
+              var pnt3 = nei.points_[j]
+              if( pnt3.a > 0 ){
+                pntlist.push(pnt3)
+              }
+            }
+          }
+          // go through point list
+          for(var n=0; n<pntlist.length; n++) {
+            var pnt4 = pntlist[n]
+            var dist = Math.hypot(pnt1.x-pnt4.x, pnt1.y-pnt4.y)
+            if( dist<minDist) {
+              minDist = dist
+              minNode = pnt4
+            }
+          }
+          if(minNode) {
+            pnt1.a = minNode.a
+            pnt1.g = minNode.g
+            altCount++
+          } else {
+            noAltCount++
+          }
+        }
+      }
+    }
+    console.log('no alt: ', noAltCount, 'changed: ', altCount)
   }
 
 }()

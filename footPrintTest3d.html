@@ -245,6 +245,28 @@ function hits2FeatureCollection( hits) {
   return featColl
 }
 
+function tinAll(){
+  for(var i=0; i<geoJsonLookup.features.length; i++) {
+    var feat = geoJsonLookup.features[i]
+    console.log = function(){}
+    setTimeout( function(feat2){
+      var success = false
+      for(tries=0; !success && tries<5; tries++) {
+        try{
+          var gj = TINNER.makeTin( feat2)
+          renderBuilding(gj)
+          success = true
+        } catch(e) {
+          if(tries>2){
+            console.error(tries, "failed")
+            console.error(e)
+          }
+        }
+      }
+    },100, feat)
+  }
+}
+
 
 
 </script>

@@ -23,6 +23,7 @@ function initThree(){
   my3d.renderer = renderer
 }
 
+var _lastRender = 0
 function renderBuilding(tin) {
   var coords = tin.geometry.coordinates
   var vertices = []
@@ -63,7 +64,11 @@ function renderBuilding(tin) {
   my3d.camera.position.y = bs.center.y + 5000
   my3d.camera.position.z = -bs.radius*4
   my3d.camera.lookAt(new THREE.Vector3(bs.center.x, bs.center.y, 0));
-  //my3d.camera.lookAt(scene.position)
-
-  my3d.renderer.render( my3d.scene, my3d.camera)
+  //render in threejs
+  var now = new Date().getTime()
+  if( now - _lastRender > 1000) {
+    _lastRender = now
+    my3d.renderer.render( my3d.scene, my3d.camera)
+  }
+  //
 }
